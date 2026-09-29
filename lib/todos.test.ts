@@ -39,6 +39,7 @@ describe("listTodos", () => {
 
     await expect(listTodos()).resolves.toEqual({ ok: true, data: records });
     expect(collection.getFullList).toHaveBeenCalledTimes(1);
+    expect(collection.getFullList).toHaveBeenCalledWith({ sort: "-created" });
   });
 
   it("returns a failure result with the server message", async () => {

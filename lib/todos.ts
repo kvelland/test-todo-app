@@ -32,7 +32,7 @@ function toError(error: unknown): string {
 
 export async function listTodos(): Promise<Result<Todo[]>> {
   try {
-    const records = await pb.collection(COLLECTION).getFullList<Todo>();
+    const records = await pb.collection(COLLECTION).getFullList<Todo>({ sort: "-created" });
     return { ok: true, data: records };
   } catch (error) {
     return { ok: false, error: toError(error) };
