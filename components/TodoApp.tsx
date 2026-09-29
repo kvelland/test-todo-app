@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore, useState } from "react";
 import type { Tag, Todo } from "@/lib/pocketbase";
+import {
+  getServerSort,
+  getStoredSort,
+  setStoredSort,
+  sortTodos,
+  subscribeToSort,
+} from "@/lib/sort";
 import { listTags, listTodos } from "@/lib/todos";
 import AddTodoForm from "./AddTodoForm";
+import SortControl from "./SortControl";
 import TagFilter from "./TagFilter";
 import TodoList from "./TodoList";
 
@@ -15,6 +23,9 @@ export default function TodoApp() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+  // Read from storage as an external store so the server and the first client
+  // render agree, then the remembered choice takes over after hydration.
+  const sort = useSyncExternalStore(subscribeToSort, getStoredSort, getServerSort);
 
   useEffect(() => {
     let active = true;
@@ -100,22 +111,25 @@ export default function TodoApp() {
     content = (
       <>
         {total > 0 ? (
-          <div className="progress">
-            <p className="progress__label">
-              {done === total ? (
-                <>All done — lovely work.</>
-              ) : (
-                <>
-                  <strong>{done}</strong> of <strong>{total}</strong> done
-                </>
-              )}
-            </p>
-            <div className="progress__track" aria-hidden="true">
-              <div
-                className="progress__fill"
-                style={{ transform: `scaleX(${total ? done / total : 0})` }}
-              />
+          <div className="list-header">
+            <div className="progress">
+              <p className="progress__label">
+                {done === total ? (
+                  <>All done — lovely work.</>
+                ) : (
+                  <>
+                    <strong>{done}</strong> of <strong>{total}</strong> done
+                  </>
+                )}
+              </p>
+              <div className="progress__track" aria-hidden="true">
+                <div
+                  className="progress__fill"
+                  style={{ transform: `scaleX(${total ? done / total : 0})` }}
+                />
+              </div>
             </div>
+            <SortControl value={sort} onChange={setStoredSort} />
           </div>
         ) : null}
         <TagFilter
@@ -125,7 +139,7 @@ export default function TodoApp() {
           onClear={() => setSelectedTagIds([])}
         />
         <TodoList
-          todos={visibleTodos}
+          todos={sortTodos(visibleTodos, sort)}
           onChanged={handleChanged}
           onDeleted={handleDeleted}
           availableTags={tags}

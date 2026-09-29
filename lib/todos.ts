@@ -40,9 +40,18 @@ export async function listTodos(): Promise<Result<Todo[]>> {
   }
 }
 
-export async function createTodo(title: string, tags: string[] = []): Promise<Result<Todo>> {
+export async function createTodo(
+  title: string,
+  deadline?: string | null,
+  tags: string[] = [],
+): Promise<Result<Todo>> {
   try {
-    const record = await pb.collection(COLLECTION).create<Todo>({ title, completed: false, tags });
+    const record = await pb.collection(COLLECTION).create<Todo>({
+      title,
+      completed: false,
+      deadline: deadline ?? "",
+      tags,
+    });
     return { ok: true, data: record };
   } catch (error) {
     return { ok: false, error: toError(error) };
@@ -51,7 +60,7 @@ export async function createTodo(title: string, tags: string[] = []): Promise<Re
 
 export async function updateTodo(
   id: string,
-  patch: Partial<Pick<Todo, "title" | "completed" | "tags">>,
+  patch: Partial<Pick<Todo, "title" | "completed" | "deadline" | "tags">>,
 ): Promise<Result<Todo>> {
   try {
     const record = await pb.collection(COLLECTION).update<Todo>(id, patch);

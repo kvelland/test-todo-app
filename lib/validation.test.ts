@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   TAG_NAME_MAX_LENGTH,
   TODO_TITLE_MAX_LENGTH,
+  validateDeadline,
   validateTagName,
   validateTodoTitle,
 } from "./validation";
@@ -64,6 +65,60 @@ describe("validateTagName", () => {
     expect(validateTagName("Groceries", ["Work", "Home"])).toEqual({
       ok: true,
       value: "Groceries",
+    });
+  });
+});
+
+describe("validateDeadline", () => {
+  const OSLO = "Europe/Oslo";
+
+  it("treats an empty date and time as no deadline", () => {
+    expect(validateDeadline({ date: "", time: "" }, { timeZone: OSLO })).toEqual({
+      ok: true,
+      value: null,
+    });
+  });
+
+  it("resolves a date-only deadline to the end of the local day", () => {
+    expect(validateDeadline({ date: "2026-10-03", time: "" }, { timeZone: OSLO })).toEqual({
+      ok: true,
+      value: "2026-10-03T21:59:59.999Z",
+    });
+  });
+
+  it("resolves a date and time to the exact local instant", () => {
+    expect(validateDeadline({ date: "2026-10-03", time: "14:00" }, { timeZone: OSLO })).toEqual({
+      ok: true,
+      value: "2026-10-03T12:00:00.000Z",
+    });
+  });
+
+  it("rejects a time without a date", () => {
+    expect(validateDeadline({ date: "", time: "14:00" }, { timeZone: OSLO })).toEqual({
+      ok: false,
+      error: "Pick a date before setting a time.",
+    });
+  });
+
+  it("rejects an impossible date", () => {
+    expect(validateDeadline({ date: "2026-02-30", time: "" })).toEqual({
+      ok: false,
+      error: "That date isn't valid.",
+    });
+    expect(validateDeadline({ date: "not-a-date", time: "" })).toEqual({
+      ok: false,
+      error: "That date isn't valid.",
+    });
+  });
+
+  it("rejects an impossible time", () => {
+    expect(validateDeadline({ date: "2026-10-03", time: "24:00" })).toEqual({
+      ok: false,
+      error: "That time isn't valid.",
+    });
+    expect(validateDeadline({ date: "2026-10-03", time: "12:75" })).toEqual({
+      ok: false,
+      error: "That time isn't valid.",
     });
   });
 });

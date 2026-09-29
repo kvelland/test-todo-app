@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # End-to-end check for the todos collection: boots PocketBase against a throwaway
-# data dir, creates and reads a record, and asserts the response shape.
+# data dir, creates and reads records (with and without a deadline), and asserts
+# the response shape.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -49,8 +50,23 @@ process.stdin.on("data", (c) => (d += c)).on("end", () => {
   if (r.collectionName !== "todos") fail("wrong collection");
   if (r.title !== "verify") fail("title not echoed");
   if (r.completed !== false) fail("completed did not default to false");
+  if (r.deadline !== "") fail("deadline did not default to an empty string");
   if (!r.created) fail("created is empty");
   if (!r.updated) fail("updated is empty");
+});
+'
+
+deadline_record="$(curl -sf -X POST "${base}/api/collections/todos/records" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"verify deadline","deadline":"2026-10-03T21:59:59.999Z"}')"
+
+echo "$deadline_record" | node -e '
+let d = "";
+process.stdin.on("data", (c) => (d += c)).on("end", () => {
+  const r = JSON.parse(d);
+  const fail = (m) => { console.error("FAIL: " + m); process.exit(1); };
+  if (!r.deadline) fail("deadline did not round-trip");
+  if (!String(r.deadline).startsWith("2026-10-03")) fail("deadline date wrong: " + r.deadline);
 });
 '
 
@@ -110,4 +126,4 @@ process.stdin.on("data", (c) => (d += c)).on("end", () => {
 });
 '
 
-echo "OK: todos + tags collections created; record create, list, and tag filter verified"
+echo "OK: todos + tags collections created; record create, list, deadline round-trip, and tag filter verified"

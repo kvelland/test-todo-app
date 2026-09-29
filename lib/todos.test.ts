@@ -29,6 +29,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     id: "rec1",
     title: "Buy milk",
     completed: false,
+    deadline: "",
     created: "2026-01-01 00:00:00.000Z",
     updated: "2026-01-01 00:00:00.000Z",
     tags: [],
@@ -77,7 +78,7 @@ describe("listTodos", () => {
 });
 
 describe("createTodo", () => {
-  it("sends completed: false and returns the created record", async () => {
+  it("sends completed: false and an empty deadline, and returns the created record", async () => {
     const created = todo({ id: "new1", title: "Read a book" });
     collection.create.mockResolvedValue(created);
 
@@ -88,6 +89,7 @@ describe("createTodo", () => {
     expect(collection.create).toHaveBeenCalledWith({
       title: "Read a book",
       completed: false,
+      deadline: "",
       tags: [],
     });
   });
@@ -96,14 +98,42 @@ describe("createTodo", () => {
     const created = todo({ id: "new1", title: "Read a book", tags: ["tag1"] });
     collection.create.mockResolvedValue(created);
 
-    await expect(createTodo("Read a book", ["tag1"])).resolves.toEqual({
+    await expect(createTodo("Read a book", null, ["tag1"])).resolves.toEqual({
       ok: true,
       data: created,
     });
     expect(collection.create).toHaveBeenCalledWith({
       title: "Read a book",
       completed: false,
+      deadline: "",
       tags: ["tag1"],
+    });
+  });
+
+  it("sends the deadline when one is provided", async () => {
+    const deadline = "2026-10-03T21:59:59.999Z";
+    const created = todo({ id: "new2", title: "Post form", deadline });
+    collection.create.mockResolvedValue(created);
+
+    await expect(createTodo("Post form", deadline)).resolves.toEqual({ ok: true, data: created });
+    expect(collection.create).toHaveBeenCalledWith({
+      title: "Post form",
+      completed: false,
+      deadline,
+      tags: [],
+    });
+  });
+
+  it("treats null as no deadline", async () => {
+    collection.create.mockResolvedValue(todo({ id: "new3" }));
+
+    await createTodo("No deadline", null);
+
+    expect(collection.create).toHaveBeenCalledWith({
+      title: "No deadline",
+      completed: false,
+      deadline: "",
+      tags: [],
     });
   });
 
@@ -185,6 +215,23 @@ describe("updateTodo", () => {
       data: updated,
     });
     expect(collection.update).toHaveBeenCalledWith("rec1", { tags: ["tag1", "tag2"] });
+  });
+
+  it("passes a deadline patch through", async () => {
+    const deadline = "2026-10-03T21:59:59.999Z";
+    const updated = todo({ deadline });
+    collection.update.mockResolvedValue(updated);
+
+    await expect(updateTodo("rec1", { deadline })).resolves.toEqual({ ok: true, data: updated });
+    expect(collection.update).toHaveBeenCalledWith("rec1", { deadline });
+  });
+
+  it("passes an empty deadline through to clear it", async () => {
+    collection.update.mockResolvedValue(todo({ deadline: "" }));
+
+    await updateTodo("rec1", { deadline: "" });
+
+    expect(collection.update).toHaveBeenCalledWith("rec1", { deadline: "" });
   });
 
   it("maps a not-found error to the server message", async () => {
