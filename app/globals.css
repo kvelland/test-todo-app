@@ -839,6 +839,8 @@ input {
 
 /* Description: one-line preview that expands to the full text. */
 .todo__desc {
+  /* The body is a flex-start column; stretch so the nowrap preview can ellipsize. */
+  align-self: stretch;
   margin-top: 0.15rem;
 }
 
@@ -912,6 +914,7 @@ input {
 
 /* Description editor: a textarea, because line breaks are kept. */
 .todo__desc-edit {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
