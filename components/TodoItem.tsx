@@ -2,8 +2,15 @@
 
 import { useRef, useState } from "react";
 import type { Todo } from "@/lib/pocketbase";
+import { linkifyDescription } from "@/lib/description";
 import { deleteTodo, updateTodo } from "@/lib/todos";
-import { TODO_TITLE_MAX_LENGTH, validateTodoTitle } from "@/lib/validation";
+import {
+  TODO_DESCRIPTION_COUNTER_THRESHOLD,
+  TODO_DESCRIPTION_MAX_LENGTH,
+  TODO_TITLE_MAX_LENGTH,
+  validateTodoDescription,
+  validateTodoTitle,
+} from "@/lib/validation";
 
 const LEAVE_MS = 280;
 
@@ -27,17 +34,24 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   // Optimistic values shown while a save is in flight; null means "use the saved todo".
   const [optimisticCompleted, setOptimisticCompleted] = useState<boolean | null>(null);
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
+  const [optimisticDescription, setOptimisticDescription] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(todo.title);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [draftDescription, setDraftDescription] = useState(todo.description);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   // Guards against Enter/Escape and the blur that follows both committing.
   const committedRef = useRef(false);
 
   const completed = optimisticCompleted ?? todo.completed;
   const title = optimisticTitle ?? todo.title;
+  const description = optimisticDescription ?? todo.description;
   const toggling = optimisticCompleted !== null;
+  const hasDescription = description !== "";
+  const firstLine = description.split("\n", 1)[0];
 
   async function handleToggle() {
     const next = !completed;
@@ -75,6 +89,7 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   function startEdit() {
     setDraft(title);
     setError(null);
+    setEditingDescription(false);
     committedRef.current = false;
     setEditing(true);
   }
@@ -112,6 +127,44 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     }
   }
 
+  function startEditDescription() {
+    setDraftDescription(description);
+    setError(null);
+    setEditing(false);
+    committedRef.current = true;
+    setEditingDescription(true);
+  }
+
+  function cancelEditDescription() {
+    setEditingDescription(false);
+    setError(null);
+  }
+
+  async function saveEditDescription() {
+    const validation = validateTodoDescription(draftDescription);
+    if (!validation.ok) {
+      // Stay in edit mode so the user can shorten the description.
+      setError(validation.error);
+      return;
+    }
+
+    setEditingDescription(false);
+    setError(null);
+
+    if (validation.value === todo.description) return;
+
+    setOptimisticDescription(validation.value);
+    const result = await updateTodo(todo.id, { description: validation.value });
+    setOptimisticDescription(null);
+
+    if (result.ok) {
+      if (validation.value === "") setDescriptionExpanded(false);
+      onChanged(result.data);
+    } else {
+      setError(`Could not save: ${result.error}`);
+    }
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -122,10 +175,19 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     }
   }
 
+  function handleDescriptionKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter inserts a newline: line breaks are part of a description, so saving
+    // is explicit (Save button) and only Escape cancels.
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelEditDescription();
+    }
+  }
+
   const className = [
     "todo",
     completed && "todo--completed",
-    editing && "todo--editing",
+    (editing || editingDescription) && "todo--editing",
     deleting && "todo--deleting",
     leaving && "todo--leaving",
   ]
@@ -163,26 +225,114 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
             maxLength={TODO_TITLE_MAX_LENGTH}
             aria-label="Edit todo title"
           />
+        ) : editingDescription ? (
+          <div className="todo__desc-edit">
+            <textarea
+              className="todo__desc-input"
+              // Focus moves here as the direct result of the user asking to edit.
+              autoFocus
+              value={draftDescription}
+              onChange={(event) => setDraftDescription(event.target.value)}
+              onKeyDown={handleDescriptionKeyDown}
+              maxLength={TODO_DESCRIPTION_MAX_LENGTH}
+              placeholder="Optional details…"
+              aria-label="Edit todo description"
+            />
+            <div className="todo__desc-meta">
+              <span className="todo__desc-count" aria-hidden={!shouldShowCounter(draftDescription)}>
+                {shouldShowCounter(draftDescription)
+                  ? `${draftDescription.length}/${TODO_DESCRIPTION_MAX_LENGTH}`
+                  : ""}
+              </span>
+              <div className="todo__desc-buttons">
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => void saveEditDescription()}
+                  aria-label={`Save description for "${title}"`}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={cancelEditDescription}
+                  aria-label={`Cancel description for "${title}"`}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
-          <span className="todo__title" onDoubleClick={startEdit}>
-            {title}
-          </span>
+          <>
+            <span className="todo__title" onDoubleClick={startEdit}>
+              {title}
+            </span>
+            {hasDescription ? (
+              <div className="todo__desc">
+                <button
+                  type="button"
+                  className="todo__desc-toggle"
+                  aria-expanded={descriptionExpanded}
+                  aria-label={`${descriptionExpanded ? "Hide" : "Show"} description for "${title}"`}
+                  onClick={() => setDescriptionExpanded((value) => !value)}
+                >
+                  <span className="todo__desc-dot" aria-hidden="true" />
+                  <span className="todo__desc-preview">{firstLine}</span>
+                </button>
+                {descriptionExpanded ? (
+                  <p className="todo__desc-text">
+                    {linkifyDescription(description).map((segment, segmentIndex) =>
+                      segment.type === "link" ? (
+                        <a
+                          key={segmentIndex}
+                          href={segment.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {segment.value}
+                        </a>
+                      ) : (
+                        <span key={segmentIndex}>{segment.value}</span>
+                      ),
+                    )}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
       <div className="todo__actions">
-        {editing ? null : (
-          <button
-            type="button"
-            className="icon-button"
-            onClick={startEdit}
-            aria-label={`Edit "${title}"`}
-            title="Edit"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
-              <path d="M13.5 6.5l4 4" />
-            </svg>
-          </button>
+        {editing || editingDescription ? null : (
+          <>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={startEdit}
+              aria-label={`Edit "${title}"`}
+              title="Edit"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+                <path d="M13.5 6.5l4 4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={startEditDescription}
+              aria-label={`${hasDescription ? "Edit" : "Add"} description for "${title}"`}
+              title={hasDescription ? "Edit description" : "Add description"}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 5.5h12" />
+                <path d="M6 10.5h12" />
+                <path d="M6 15.5h8" />
+              </svg>
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -206,4 +356,8 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
       ) : null}
     </li>
   );
+}
+
+function shouldShowCounter(draft: string) {
+  return draft.length >= TODO_DESCRIPTION_COUNTER_THRESHOLD;
 }

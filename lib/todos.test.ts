@@ -21,6 +21,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
   return {
     id: "rec1",
     title: "Buy milk",
+    description: "",
     completed: false,
     created: "2026-01-01 00:00:00.000Z",
     updated: "2026-01-01 00:00:00.000Z",
@@ -68,6 +69,22 @@ describe("createTodo", () => {
     });
     expect(collection.create).toHaveBeenCalledWith({
       title: "Read a book",
+      description: "",
+      completed: false,
+    });
+  });
+
+  it("sends a description when one is provided", async () => {
+    const created = todo({ id: "new2", title: "Read a book", description: "Science fiction" });
+    collection.create.mockResolvedValue(created);
+
+    await expect(createTodo("Read a book", "Science fiction")).resolves.toEqual({
+      ok: true,
+      data: created,
+    });
+    expect(collection.create).toHaveBeenCalledWith({
+      title: "Read a book",
+      description: "Science fiction",
       completed: false,
     });
   });
@@ -139,6 +156,17 @@ describe("updateTodo", () => {
       data: updated,
     });
     expect(collection.update).toHaveBeenCalledWith("rec1", { completed: true });
+  });
+
+  it("sends a description patch", async () => {
+    const updated = todo({ description: "Two bottles" });
+    collection.update.mockResolvedValue(updated);
+
+    await expect(updateTodo("rec1", { description: "Two bottles" })).resolves.toEqual({
+      ok: true,
+      data: updated,
+    });
+    expect(collection.update).toHaveBeenCalledWith("rec1", { description: "Two bottles" });
   });
 
   it("maps a not-found error to the server message", async () => {

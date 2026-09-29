@@ -3,6 +3,7 @@ import PocketBase from "pocketbase";
 export type Todo = {
   id: string;
   title: string;
+  description: string;
   completed: boolean;
   created: string;
   updated: string;

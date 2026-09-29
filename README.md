@@ -47,7 +47,11 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to list, add, complete, edit
-(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos.
+(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos. A todo can
+also carry an optional description (up to 2,000 characters, line breaks kept): reveal the field
+with **Add description** when creating, or use the description button on a todo to add, edit, or
+clear one. Todos with a description show a dot and a one-line preview that expands to the full
+text, where `http`/`https` links are clickable.
 
 ## Scripts
 
@@ -91,13 +95,14 @@ the existing file.
 
 ### Schema — `todos`
 
-| Field       | Type     | Rules                    |
-| ----------- | -------- | ------------------------ |
-| `id`        | text     | system, auto-generated   |
-| `title`     | text     | required, max 200 chars  |
-| `completed` | bool     | default `false`          |
-| `created`   | autodate | set on create            |
-| `updated`   | autodate | set on create and update |
+| Field         | Type     | Rules                          |
+| ------------- | -------- | ------------------------------ |
+| `id`          | text     | system, auto-generated         |
+| `title`       | text     | required, max 200 chars        |
+| `description` | text     | optional, max 2000 chars, `""` |
+| `completed`   | bool     | default `false`                |
+| `created`     | autodate | set on create                  |
+| `updated`     | autodate | set on create and update       |
 
 API rules for `todos` are currently **public** (empty rules): list, view, create, update, and
 delete all work without authentication — this is a single-user setup for now. Authentication is a
