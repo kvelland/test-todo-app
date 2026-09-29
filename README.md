@@ -1,16 +1,61 @@
 # test-todo-app
 
-A todo app backed by [PocketBase](https://pocketbase.io/). This repository holds the
-PocketBase setup: the download/run tooling and the `todos` collection schema, shipped as a
-migration so a fresh clone sets itself up automatically.
+A simple todo app built with [Next.js](https://nextjs.org) (App Router) and TypeScript, backed by
+[PocketBase](https://pocketbase.io/).
 
 ## Prerequisites
 
-- `curl` or `wget`
+- [Node.js](https://nodejs.org) 18.18 or newer (Node 20+ recommended)
+- npm (the lockfile is `package-lock.json`)
+- `curl` (used by the PocketBase download script and by `scripts/verify-todos.sh`; `wget` also works for the download)
 - `unzip`
-- macOS or Linux (amd64 / arm64 / armv7)
+- macOS or Linux (amd64 / arm64 / armv7) for the PocketBase binary
 
-## Setup
+## Install
+
+```bash
+npm install
+```
+
+## Environment
+
+Copy the example environment file and adjust values as needed:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable                     | Description                         | Default                 |
+| ---------------------------- | ----------------------------------- | ----------------------- |
+| `NEXT_PUBLIC_POCKETBASE_URL` | Base URL of the PocketBase backend. | `http://127.0.0.1:8090` |
+
+`.env.local` is git-ignored; commit new variables to `.env.example` instead.
+
+## Run locally
+
+Start PocketBase (see below) and then the Next.js dev server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Scripts
+
+| Script                 | Description                     |
+| ---------------------- | ------------------------------- |
+| `npm run dev`          | Start the development server.   |
+| `npm run build`        | Create a production build.      |
+| `npm run start`        | Serve the production build.     |
+| `npm run lint`         | Run ESLint.                     |
+| `npm run typecheck`    | Type-check with `tsc --noEmit`. |
+| `npm run format`       | Format files with Prettier.     |
+| `npm run format:check` | Check formatting with Prettier. |
+
+## PocketBase
+
+### Setup
 
 Download the pinned PocketBase binary (v0.40.4 by default) into the repo root:
 
@@ -21,7 +66,7 @@ Download the pinned PocketBase binary (v0.40.4 by default) into the repo root:
 The script is idempotent — it is a no-op once the correct version is present. Override the
 version with `PB_VERSION=0.40.4 ./scripts/download-pocketbase.sh`.
 
-## Run
+### Run
 
 ```sh
 ./pocketbase serve
@@ -35,7 +80,7 @@ On first run PocketBase creates `pb_data/` (gitignored) and applies the migratio
 changes as new migrations in `pb_migrations/` with a **larger** numeric prefix (Unix seconds) than
 the existing file.
 
-## Schema — `todos`
+### Schema — `todos`
 
 | Field       | Type       | Rules                       |
 | ----------- | ---------- | --------------------------- |
@@ -49,7 +94,7 @@ API rules for `todos` are currently **public** (empty rules): list, view, create
 delete all work without authentication — this is a single-user setup for now. Authentication is a
 later round; do not treat the open rules as final.
 
-## REST API
+### REST API
 
 Create a record:
 
@@ -65,7 +110,7 @@ List records:
 curl http://127.0.0.1:8090/api/collections/todos/records
 ```
 
-## Verify
+### Verify
 
 Run the end-to-end check against a throwaway data directory (boots PocketBase on port 8099,
 creates and reads a record, asserts the response shape, then cleans up):
