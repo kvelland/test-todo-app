@@ -100,3 +100,50 @@ h1 {
 .error {
   color: var(--danger);
 }
+
+.add-todo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.add-todo__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-todo__error {
+  flex-basis: 100%;
+  color: var(--danger);
+}
+
+input[type="text"] {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.add-todo__button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}

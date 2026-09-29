@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Todo } from "@/lib/pocketbase";
 import { listTodos } from "@/lib/todos";
+import AddTodoForm from "./AddTodoForm";
 import TodoList from "./TodoList";
 
 type Status = "loading" | "error" | "ready";
@@ -33,21 +34,31 @@ export default function TodoApp() {
     };
   }, []);
 
+  function handleAdded(todo: Todo) {
+    setTodos((current) => [todo, ...current]);
+  }
+
+  let content: React.ReactNode;
   if (status === "loading") {
-    return (
+    content = (
       <p className="status" role="status">
         Loading todos…
       </p>
     );
-  }
-
-  if (status === "error") {
-    return (
+  } else if (status === "error") {
+    content = (
       <p className="error" role="alert">
         Could not load todos: {error}
       </p>
     );
+  } else {
+    content = <TodoList todos={todos} />;
   }
 
-  return <TodoList todos={todos} />;
+  return (
+    <>
+      <AddTodoForm onAdded={handleAdded} />
+      {content}
+    </>
+  );
 }
