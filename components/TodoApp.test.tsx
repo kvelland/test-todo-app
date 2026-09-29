@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Todo } from "@/lib/pocketbase";
@@ -117,5 +117,58 @@ describe("TodoApp add", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("title: Cannot be blank.");
     expect(input).toHaveValue("Oops");
+  });
+});
+
+describe("TodoApp toggle", () => {
+  it("toggles completion optimistically and persists it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo()],
+    });
+    let resolveUpdate!: (value: todos.Result<Todo>) => void;
+    vi.mocked(todos.updateTodo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      }),
+    );
+
+    render(<TodoApp />);
+    const checkbox = await screen.findByRole("checkbox");
+    expect(checkbox).not.toBeChecked();
+
+    await user.click(checkbox);
+
+    // Optimistic: checked before the API responds.
+    expect(checkbox).toBeChecked();
+    expect(screen.getByText("Buy milk").closest("li")).toHaveClass("todo--completed");
+    expect(todos.updateTodo).toHaveBeenCalledWith("1", { completed: true });
+
+    resolveUpdate({ ok: true, data: makeTodo({ completed: true }) });
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).toBeChecked();
+  });
+
+  it("reverts and shows an error when saving fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo()],
+    });
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: false,
+      error: "Network unreachable",
+    });
+
+    render(<TodoApp />);
+    const checkbox = await screen.findByRole("checkbox");
+
+    await user.click(checkbox);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save: Network unreachable",
+    );
+    expect(checkbox).not.toBeChecked();
   });
 });
