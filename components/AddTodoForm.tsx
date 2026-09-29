@@ -14,14 +14,12 @@ type AddTodoFormProps = {
 export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Creates run concurrently: the input clears as soon as a todo is submitted
+  // so the user can type the next one straight away.
+  const [pending, setPending] = useState(0);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (saving) {
-      return;
-    }
 
     const validation = validateTodoTitle(title);
     if (!validation.ok) {
@@ -29,19 +27,21 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
       return;
     }
 
-    setSaving(true);
     setError(null);
+    setTitle("");
+    setPending((count) => count + 1);
 
     const result = await createTodo(validation.value);
 
-    setSaving(false);
+    setPending((count) => count - 1);
 
     if (!result.ok) {
       setError(result.error);
+      // Give the text back unless the user has already started a new todo.
+      setTitle((current) => (current === "" ? validation.value : current));
       return;
     }
 
-    setTitle("");
     onAdded?.(result.data);
   }
 
@@ -55,10 +55,9 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
         placeholder="Add a todo"
         aria-label="New todo title"
         maxLength={TODO_TITLE_MAX_LENGTH}
-        disabled={saving}
       />
-      <button type="submit" className="add-todo__button" disabled={saving}>
-        {saving ? "Adding…" : "Add"}
+      <button type="submit" className="add-todo__button">
+        {pending > 0 ? "Adding…" : "Add"}
       </button>
       {error ? (
         <p role="alert" className="add-todo__error">

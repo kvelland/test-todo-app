@@ -33,13 +33,21 @@ cp .env.example .env.local
 
 ## Run locally
 
-Start PocketBase (see below) and then the Next.js dev server:
+Start PocketBase (see [PocketBase](#pocketbase) below) in one terminal:
+
+```bash
+./scripts/download-pocketbase.sh
+./pocketbase serve
+```
+
+Then the Next.js dev server in another:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) to list, add, complete, edit
+(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos.
 
 ## Scripts
 
@@ -50,6 +58,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start`        | Serve the production build.     |
 | `npm run lint`         | Run ESLint.                     |
 | `npm run typecheck`    | Type-check with `tsc --noEmit`. |
+| `npm test`             | Run the Vitest suite.           |
 | `npm run format`       | Format files with Prettier.     |
 | `npm run format:check` | Check formatting with Prettier. |
 
