@@ -46,21 +46,52 @@ export default function TodoApp() {
     setTodos((current) => current.filter((todo) => todo.id !== id));
   }
 
+  const total = todos.length;
+  const done = todos.filter((todo) => todo.completed).length;
+
   let content: React.ReactNode;
   if (status === "loading") {
     content = (
-      <p className="status" role="status">
-        Loading todos…
-      </p>
+      <div className="loading">
+        <p className="sr-only" role="status">
+          Loading todos…
+        </p>
+        {[0, 1, 2].map((row) => (
+          <div key={row} className="skeleton" style={{ "--i": row } as React.CSSProperties} />
+        ))}
+      </div>
     );
   } else if (status === "error") {
     content = (
-      <p className="error" role="alert">
+      <p className="banner banner--error" role="alert">
         Could not load todos: {error}
       </p>
     );
   } else {
-    content = <TodoList todos={todos} onChanged={handleChanged} onDeleted={handleDeleted} />;
+    content = (
+      <>
+        {total > 0 ? (
+          <div className="progress">
+            <p className="progress__label">
+              {done === total ? (
+                <>All done — lovely work.</>
+              ) : (
+                <>
+                  <strong>{done}</strong> of <strong>{total}</strong> done
+                </>
+              )}
+            </p>
+            <div className="progress__track" aria-hidden="true">
+              <div
+                className="progress__fill"
+                style={{ transform: `scaleX(${total ? done / total : 0})` }}
+              />
+            </div>
+          </div>
+        ) : null}
+        <TodoList todos={todos} onChanged={handleChanged} onDeleted={handleDeleted} />
+      </>
+    );
   }
 
   return (

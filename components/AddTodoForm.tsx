@@ -47,17 +47,18 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
 
   return (
     <form className="add-todo" onSubmit={handleSubmit} noValidate>
+      <span className="add-todo__plus" aria-hidden="true" />
       <input
         type="text"
         className="add-todo__input"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
-        placeholder="Add a todo"
+        placeholder="What needs doing?"
         aria-label="New todo title"
         maxLength={TODO_TITLE_MAX_LENGTH}
       />
       <button type="submit" className="add-todo__button">
-        {pending > 0 ? "Adding…" : "Add"}
+        <span className="add-todo__label">{pending > 0 ? "Adding…" : "Add"}</span>
       </button>
       {error ? (
         <p role="alert" className="add-todo__error">
