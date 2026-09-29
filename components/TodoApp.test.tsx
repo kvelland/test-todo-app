@@ -85,7 +85,43 @@ describe("TodoApp add", () => {
     const items = await screen.findAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Write tests");
     expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
     expect(todos.listTodos).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the user add another todo while a create is in flight", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [] });
+    let resolveFirst!: (value: todos.Result<Todo>) => void;
+    vi.mocked(todos.createTodo)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        data: makeTodo({ id: "2", title: "Second" }),
+      });
+
+    render(<TodoApp />);
+    await screen.findByText("No todos yet");
+
+    const input = screen.getByLabelText("New todo title");
+    await user.type(input, "First{Enter}");
+
+    // Cleared and still usable while the first create is pending.
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Adding…" })).toBeInTheDocument();
+
+    await user.type(input, "Second{Enter}");
+    expect(todos.createTodo).toHaveBeenNthCalledWith(2, "Second");
+
+    resolveFirst({ ok: true, data: makeTodo({ id: "1", title: "First" }) });
+    expect(await screen.findByText("First")).toBeInTheDocument();
+    expect(screen.getByText("Second")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
   });
 
   it("rejects an empty title without calling the API", async () => {
