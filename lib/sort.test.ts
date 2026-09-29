@@ -11,6 +11,7 @@ function todo(id: string, deadline: string, created: string): Todo {
     deadline,
     created,
     updated: created,
+    tags: [],
   };
 }
 

@@ -2,17 +2,26 @@
 
 import { useState } from "react";
 
-import type { Todo } from "@/lib/pocketbase";
+import type { Tag, Todo } from "@/lib/pocketbase";
 import { createTodo } from "@/lib/todos";
 import { TODO_TITLE_MAX_LENGTH, validateDeadline, validateTodoTitle } from "@/lib/validation";
+import TagInput from "./TagInput";
 
 type AddTodoFormProps = {
   /** Called with the created todo so the list can insert it without a reload. */
   onAdded?: (todo: Todo) => void;
+  availableTags?: Tag[];
+  /** Called when the user creates a brand new tag, so the app can keep its list. */
+  onTagCreated?: (tag: Tag) => void;
 };
 
-export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
+export default function AddTodoForm({
+  onAdded,
+  availableTags = [],
+  onTagCreated,
+}: AddTodoFormProps) {
   const [title, setTitle] = useState("");
+  const [tags, setTags] = useState<Tag[]>([]);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +46,16 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
 
     setError(null);
     setTitle("");
+    setTags([]);
     setDeadlineDate("");
     setDeadlineTime("");
     setPending((count) => count + 1);
 
-    const result = await createTodo(titleCheck.value, deadlineCheck.value);
+    const result = await createTodo(
+      titleCheck.value,
+      deadlineCheck.value,
+      tags.map((tag) => tag.id),
+    );
 
     setPending((count) => count - 1);
 
@@ -97,6 +111,13 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
         </span>
         <span className="add-todo__hint">Optional — leave the time blank for end of day</span>
       </div>
+      <TagInput
+        label="Tags"
+        selected={tags}
+        availableTags={availableTags}
+        onChange={setTags}
+        onCreated={onTagCreated}
+      />
       {error ? (
         <p role="alert" className="add-todo__error">
           {error}

@@ -1,13 +1,27 @@
-import type { Todo } from "@/lib/pocketbase";
+import type { Tag, Todo } from "@/lib/pocketbase";
 import TodoItem from "./TodoItem";
 
 type TodoListProps = {
   todos: Todo[];
   onChanged: (todo: Todo) => void;
   onDeleted: (id: string) => void;
+  availableTags?: Tag[];
+  onTagCreated?: (tag: Tag) => void;
+  onFilterTag?: (tagId: string) => void;
+  emptyTitle?: string;
+  emptyHint?: string;
 };
 
-export default function TodoList({ todos, onChanged, onDeleted }: TodoListProps) {
+export default function TodoList({
+  todos,
+  onChanged,
+  onDeleted,
+  availableTags = [],
+  onTagCreated,
+  onFilterTag,
+  emptyTitle = "No todos yet",
+  emptyHint = "A clear day. Add something above when you're ready.",
+}: TodoListProps) {
   if (todos.length === 0) {
     return (
       <div className="empty">
@@ -19,8 +33,8 @@ export default function TodoList({ todos, onChanged, onDeleted }: TodoListProps)
           />
           <path className="empty__hill" d="M0 108c24-18 44-22 64-14s34 10 56 14v12H0z" />
         </svg>
-        <p className="empty__title">No todos yet</p>
-        <p className="empty__hint">A clear day. Add something above when you&apos;re ready.</p>
+        <p className="empty__title">{emptyTitle}</p>
+        <p className="empty__hint">{emptyHint}</p>
       </div>
     );
   }
@@ -34,6 +48,9 @@ export default function TodoList({ todos, onChanged, onDeleted }: TodoListProps)
           index={index}
           onChanged={onChanged}
           onDeleted={onDeleted}
+          availableTags={availableTags}
+          onTagCreated={onTagCreated}
+          onFilterTag={onFilterTag}
         />
       ))}
     </ul>

@@ -8,6 +8,15 @@ export type Todo = {
   deadline: string;
   created: string;
   updated: string;
+  /** Relation ids pointing at records in the `tags` collection. */
+  tags: string[];
+};
+
+export type Tag = {
+  id: string;
+  name: string;
+  created: string;
+  updated: string;
 };
 
 const url = process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "http://127.0.0.1:8090";

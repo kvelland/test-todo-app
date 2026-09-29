@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientResponseError } from "pocketbase";
-import type { Todo } from "./pocketbase";
+import type { Tag, Todo } from "./pocketbase";
 
 const { collection } = vi.hoisted(() => ({
   collection: {
@@ -11,11 +11,18 @@ const { collection } = vi.hoisted(() => ({
   },
 }));
 
+const { collectionNames } = vi.hoisted(() => ({ collectionNames: [] as string[] }));
+
 vi.mock("./pocketbase", () => ({
-  pb: { collection: () => collection },
+  pb: {
+    collection: (name: string) => {
+      collectionNames.push(name);
+      return collection;
+    },
+  },
 }));
 
-import { createTodo, deleteTodo, listTodos, updateTodo } from "./todos";
+import { createTag, createTodo, deleteTodo, listTags, listTodos, updateTodo } from "./todos";
 
 function todo(overrides: Partial<Todo> = {}): Todo {
   return {
@@ -25,12 +32,24 @@ function todo(overrides: Partial<Todo> = {}): Todo {
     deadline: "",
     created: "2026-01-01 00:00:00.000Z",
     updated: "2026-01-01 00:00:00.000Z",
+    tags: [],
+    ...overrides,
+  };
+}
+
+function tag(overrides: Partial<Tag> = {}): Tag {
+  return {
+    id: "tag1",
+    name: "Work",
+    created: "2026-01-01 00:00:00.000Z",
+    updated: "2026-01-01 00:00:00.000Z",
     ...overrides,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  collectionNames.length = 0;
 });
 
 describe("listTodos", () => {
@@ -71,6 +90,23 @@ describe("createTodo", () => {
       title: "Read a book",
       completed: false,
       deadline: "",
+      tags: [],
+    });
+  });
+
+  it("sends the tag ids when creating a tagged todo", async () => {
+    const created = todo({ id: "new1", title: "Read a book", tags: ["tag1"] });
+    collection.create.mockResolvedValue(created);
+
+    await expect(createTodo("Read a book", null, ["tag1"])).resolves.toEqual({
+      ok: true,
+      data: created,
+    });
+    expect(collection.create).toHaveBeenCalledWith({
+      title: "Read a book",
+      completed: false,
+      deadline: "",
+      tags: ["tag1"],
     });
   });
 
@@ -84,6 +120,7 @@ describe("createTodo", () => {
       title: "Post form",
       completed: false,
       deadline,
+      tags: [],
     });
   });
 
@@ -96,6 +133,7 @@ describe("createTodo", () => {
       title: "No deadline",
       completed: false,
       deadline: "",
+      tags: [],
     });
   });
 
@@ -168,6 +206,17 @@ describe("updateTodo", () => {
     expect(collection.update).toHaveBeenCalledWith("rec1", { completed: true });
   });
 
+  it("sends a tags patch and returns the updated record", async () => {
+    const updated = todo({ tags: ["tag1", "tag2"] });
+    collection.update.mockResolvedValue(updated);
+
+    await expect(updateTodo("rec1", { tags: ["tag1", "tag2"] })).resolves.toEqual({
+      ok: true,
+      data: updated,
+    });
+    expect(collection.update).toHaveBeenCalledWith("rec1", { tags: ["tag1", "tag2"] });
+  });
+
   it("passes a deadline patch through", async () => {
     const deadline = "2026-10-03T21:59:59.999Z";
     const updated = todo({ deadline });
@@ -196,6 +245,69 @@ describe("updateTodo", () => {
     await expect(updateTodo("missing", { title: "x" })).resolves.toEqual({
       ok: false,
       error: "The requested resource wasn't found.",
+    });
+  });
+});
+
+describe("listTags", () => {
+  it("returns the tags sorted by name", async () => {
+    const records = [tag({ id: "t1", name: "Home" }), tag({ id: "t2", name: "Work" })];
+    collection.getFullList.mockResolvedValue(records);
+
+    await expect(listTags()).resolves.toEqual({ ok: true, data: records });
+    expect(collectionNames).toContain("tags");
+    expect(collection.getFullList).toHaveBeenCalledWith({ sort: "name" });
+  });
+
+  it("returns a failure result with the server message", async () => {
+    collection.getFullList.mockRejectedValue(
+      new ClientResponseError({
+        status: 500,
+        response: { message: "Something failed upstream." },
+      }),
+    );
+
+    await expect(listTags()).resolves.toEqual({
+      ok: false,
+      error: "Something failed upstream.",
+    });
+  });
+});
+
+describe("createTag", () => {
+  it("creates the tag in the tags collection when no match exists", async () => {
+    collection.getFullList.mockResolvedValue([]);
+    const created = tag({ id: "t9", name: "Groceries" });
+    collection.create.mockResolvedValue(created);
+
+    await expect(createTag("  Groceries  ")).resolves.toEqual({ ok: true, data: created });
+    expect(collectionNames).toContain("tags");
+    expect(collection.create).toHaveBeenCalledWith({ name: "Groceries" });
+  });
+
+  it("returns the existing tag (case-insensitively) without creating a duplicate", async () => {
+    const existing = tag({ id: "t1", name: "Work" });
+    collection.getFullList.mockResolvedValue([existing]);
+
+    await expect(createTag("work")).resolves.toEqual({ ok: true, data: existing });
+    expect(collection.create).not.toHaveBeenCalled();
+  });
+
+  it("maps a validation error to a field-level message", async () => {
+    collection.getFullList.mockResolvedValue([]);
+    collection.create.mockRejectedValue(
+      new ClientResponseError({
+        status: 400,
+        response: {
+          message: "Failed to create record.",
+          data: { name: { message: "Cannot be blank." } },
+        },
+      }),
+    );
+
+    await expect(createTag("x")).resolves.toEqual({
+      ok: false,
+      error: "name: Cannot be blank.",
     });
   });
 });
