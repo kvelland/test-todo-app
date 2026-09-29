@@ -158,3 +158,9 @@ button:disabled {
   color: var(--danger);
   font-size: 0.875rem;
 }
+
+.todo__delete {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.875rem;
+  color: var(--danger);
+}

@@ -42,6 +42,10 @@ export default function TodoApp() {
     setTodos((current) => current.map((todo) => (todo.id === updated.id ? updated : todo)));
   }
 
+  function handleDeleted(id: string) {
+    setTodos((current) => current.filter((todo) => todo.id !== id));
+  }
+
   let content: React.ReactNode;
   if (status === "loading") {
     content = (
@@ -56,7 +60,7 @@ export default function TodoApp() {
       </p>
     );
   } else {
-    content = <TodoList todos={todos} onChanged={handleChanged} />;
+    content = <TodoList todos={todos} onChanged={handleChanged} onDeleted={handleDeleted} />;
   }
 
   return (
