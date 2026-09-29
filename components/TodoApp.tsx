@@ -38,6 +38,10 @@ export default function TodoApp() {
     setTodos((current) => [todo, ...current]);
   }
 
+  function handleChanged(updated: Todo) {
+    setTodos((current) => current.map((todo) => (todo.id === updated.id ? updated : todo)));
+  }
+
   let content: React.ReactNode;
   if (status === "loading") {
     content = (
@@ -52,7 +56,7 @@ export default function TodoApp() {
       </p>
     );
   } else {
-    content = <TodoList todos={todos} />;
+    content = <TodoList todos={todos} onChanged={handleChanged} />;
   }
 
   return (
