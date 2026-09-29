@@ -1,31 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Todo } from "@/lib/pocketbase";
-import { listTodos } from "@/lib/todos";
+import { useEffect, useSyncExternalStore, useState } from "react";
+import type { Tag, Todo } from "@/lib/pocketbase";
+import {
+  getServerSort,
+  getStoredSort,
+  setStoredSort,
+  sortTodos,
+  subscribeToSort,
+} from "@/lib/sort";
+import { listTags, listTodos } from "@/lib/todos";
 import AddTodoForm from "./AddTodoForm";
+import SortControl from "./SortControl";
+import TagFilter from "./TagFilter";
 import TodoList from "./TodoList";
 
 type Status = "loading" | "error" | "ready";
 
 export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+  // Read from storage as an external store so the server and the first client
+  // render agree, then the remembered choice takes over after hydration.
+  const sort = useSyncExternalStore(subscribeToSort, getStoredSort, getServerSort);
 
   useEffect(() => {
     let active = true;
 
     (async () => {
-      const result = await listTodos();
+      const [todosResult, tagsResult] = await Promise.all([listTodos(), listTags()]);
       if (!active) return;
 
-      if (result.ok) {
-        setTodos(result.data);
-        setStatus("ready");
-      } else {
-        setError(result.error);
+      if (!todosResult.ok) {
+        setError(todosResult.error);
         setStatus("error");
+      } else if (!tagsResult.ok) {
+        setError(tagsResult.error);
+        setStatus("error");
+      } else {
+        setTodos(todosResult.data);
+        setTags(tagsResult.data);
+        setStatus("ready");
       }
     })();
 
@@ -46,8 +64,30 @@ export default function TodoApp() {
     setTodos((current) => current.filter((todo) => todo.id !== id));
   }
 
+  function handleTagCreated(tag: Tag) {
+    setTags((current) =>
+      current.some((existing) => existing.id === tag.id)
+        ? current
+        : [...current, tag].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+  }
+
+  function handleToggleTag(tagId: string) {
+    setSelectedTagIds((current) =>
+      current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId],
+    );
+  }
+
   const total = todos.length;
   const done = todos.filter((todo) => todo.completed).length;
+
+  const visibleTodos =
+    selectedTagIds.length === 0
+      ? todos
+      : todos.filter((todo) => todo.tags.some((id) => selectedTagIds.includes(id)));
+
+  // Only the filtered view gets the "no matches" wording; an empty list is still "No todos yet".
+  const filteredEmpty = selectedTagIds.length > 0 && total > 0;
 
   let content: React.ReactNode;
   if (status === "loading") {
@@ -71,32 +111,50 @@ export default function TodoApp() {
     content = (
       <>
         {total > 0 ? (
-          <div className="progress">
-            <p className="progress__label">
-              {done === total ? (
-                <>All done — lovely work.</>
-              ) : (
-                <>
-                  <strong>{done}</strong> of <strong>{total}</strong> done
-                </>
-              )}
-            </p>
-            <div className="progress__track" aria-hidden="true">
-              <div
-                className="progress__fill"
-                style={{ transform: `scaleX(${total ? done / total : 0})` }}
-              />
+          <div className="list-header">
+            <div className="progress">
+              <p className="progress__label">
+                {done === total ? (
+                  <>All done — lovely work.</>
+                ) : (
+                  <>
+                    <strong>{done}</strong> of <strong>{total}</strong> done
+                  </>
+                )}
+              </p>
+              <div className="progress__track" aria-hidden="true">
+                <div
+                  className="progress__fill"
+                  style={{ transform: `scaleX(${total ? done / total : 0})` }}
+                />
+              </div>
             </div>
+            <SortControl value={sort} onChange={setStoredSort} />
           </div>
         ) : null}
-        <TodoList todos={todos} onChanged={handleChanged} onDeleted={handleDeleted} />
+        <TagFilter
+          tags={tags}
+          selectedIds={selectedTagIds}
+          onToggle={handleToggleTag}
+          onClear={() => setSelectedTagIds([])}
+        />
+        <TodoList
+          todos={sortTodos(visibleTodos, sort)}
+          onChanged={handleChanged}
+          onDeleted={handleDeleted}
+          availableTags={tags}
+          onTagCreated={handleTagCreated}
+          onFilterTag={handleToggleTag}
+          emptyTitle={filteredEmpty ? "No todos match these tags" : undefined}
+          emptyHint={filteredEmpty ? "Try a different tag or clear the filter." : undefined}
+        />
       </>
     );
   }
 
   return (
     <>
-      <AddTodoForm onAdded={handleAdded} />
+      <AddTodoForm onAdded={handleAdded} availableTags={tags} onTagCreated={handleTagCreated} />
       {content}
     </>
   );

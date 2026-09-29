@@ -1,16 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Todo } from "@/lib/pocketbase";
+import { deadlineState, formatDeadline, splitDeadline } from "@/lib/deadline";
 import { linkifyDescription } from "@/lib/description";
+import type { Tag, Todo } from "@/lib/pocketbase";
 import { deleteTodo, updateTodo } from "@/lib/todos";
 import {
   TODO_DESCRIPTION_COUNTER_THRESHOLD,
   TODO_DESCRIPTION_MAX_LENGTH,
   TODO_TITLE_MAX_LENGTH,
+  validateDeadline,
   validateTodoDescription,
   validateTodoTitle,
 } from "@/lib/validation";
+import TagChips from "./TagChips";
+import TagInput from "./TagInput";
 
 const LEAVE_MS = 280;
 
@@ -28,21 +32,39 @@ type TodoItemProps = {
   index?: number;
   onChanged: (todo: Todo) => void;
   onDeleted: (id: string) => void;
+  /** All known tags, used to resolve this todo's tag ids to names. */
+  availableTags?: Tag[];
+  onTagCreated?: (tag: Tag) => void;
+  /** Applies a tag to the list filter; makes the chips clickable. */
+  onFilterTag?: (tagId: string) => void;
 };
 
-export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: TodoItemProps) {
+export default function TodoItem({
+  todo,
+  index = 0,
+  onChanged,
+  onDeleted,
+  availableTags = [],
+  onTagCreated,
+  onFilterTag,
+}: TodoItemProps) {
   // Optimistic values shown while a save is in flight; null means "use the saved todo".
   const [optimisticCompleted, setOptimisticCompleted] = useState<boolean | null>(null);
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
   const [optimisticDescription, setOptimisticDescription] = useState<string | null>(null);
+  const [optimisticTags, setOptimisticTags] = useState<string[] | null>(null);
+  const [optimisticDeadline, setOptimisticDeadline] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingTags, setEditingTags] = useState(false);
   const [draft, setDraft] = useState(todo.title);
   const [editingDescription, setEditingDescription] = useState(false);
   const [draftDescription, setDraftDescription] = useState(todo.description);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [draftDate, setDraftDate] = useState("");
+  const [draftTime, setDraftTime] = useState("");
   // Guards against Enter/Escape and the blur that follows both committing.
   const committedRef = useRef(false);
 
@@ -52,6 +74,13 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   const toggling = optimisticCompleted !== null;
   const hasDescription = description !== "";
   const firstLine = description.split("\n", 1)[0];
+  const deadline = optimisticDeadline ?? todo.deadline;
+  const tagIds = optimisticTags ?? todo.tags;
+  const todoTags = availableTags.filter((tag) => tagIds.includes(tag.id));
+
+  const state = deadline ? deadlineState(deadline, new Date()) : "none";
+  // Completed todos show their deadline but are never marked overdue.
+  const overdue = state === "overdue" && !completed;
 
   async function handleToggle() {
     const next = !completed;
@@ -87,7 +116,12 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   }
 
   function startEdit() {
+    // Seed from the shown values (optimistic when a save is still in flight) so
+    // reopening the editor never resurrects a deadline the user just replaced.
+    const split = splitDeadline(deadline);
     setDraft(title);
+    setDraftDate(split?.date ?? "");
+    setDraftTime(split?.time ?? "");
     setError(null);
     setEditingDescription(false);
     committedRef.current = false;
@@ -103,10 +137,17 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   async function saveEdit() {
     if (committedRef.current) return;
 
-    const validation = validateTodoTitle(draft);
-    if (!validation.ok) {
+    const titleCheck = validateTodoTitle(draft);
+    if (!titleCheck.ok) {
       // Stay in edit mode so the user can correct the title.
-      setError(validation.error);
+      setError(titleCheck.error);
+      return;
+    }
+
+    const deadlineCheck = validateDeadline({ date: draftDate, time: draftTime });
+    if (!deadlineCheck.ok) {
+      // Stay in edit mode so the user can correct the deadline.
+      setError(deadlineCheck.error);
       return;
     }
 
@@ -114,11 +155,19 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     setEditing(false);
     setError(null);
 
-    if (validation.value === todo.title) return;
+    const nextDeadline = deadlineCheck.value ?? "";
+    const patch: Partial<Pick<Todo, "title" | "deadline">> = {};
+    if (titleCheck.value !== todo.title) patch.title = titleCheck.value;
+    if (nextDeadline !== todo.deadline) patch.deadline = nextDeadline;
+    if (patch.title === undefined && patch.deadline === undefined) return;
 
-    setOptimisticTitle(validation.value);
-    const result = await updateTodo(todo.id, { title: validation.value });
+    if (patch.title !== undefined) setOptimisticTitle(patch.title);
+    if (patch.deadline !== undefined) setOptimisticDeadline(patch.deadline);
+
+    const result = await updateTodo(todo.id, patch);
+
     setOptimisticTitle(null);
+    setOptimisticDeadline(null);
 
     if (result.ok) {
       onChanged(result.data);
@@ -165,6 +214,21 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     }
   }
 
+  async function saveTags(next: Tag[]) {
+    const nextIds = next.map((tag) => tag.id);
+    setError(null);
+    setOptimisticTags(nextIds);
+
+    const result = await updateTodo(todo.id, { tags: nextIds });
+
+    setOptimisticTags(null);
+    if (result.ok) {
+      onChanged(result.data);
+    } else {
+      setError(`Could not save: ${result.error}`);
+    }
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -184,12 +248,28 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     }
   }
 
+  // Save once focus leaves the whole edit block (title or either deadline field),
+  // not when it merely moves between them.
+  function handleEditBlur(event: React.FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      void saveEdit();
+    }
+  }
+
   const className = [
     "todo",
     completed && "todo--completed",
     (editing || editingDescription) && "todo--editing",
     deleting && "todo--deleting",
     leaving && "todo--leaving",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const dueClassName = [
+    "todo__due",
+    overdue && "todo__due--overdue",
+    !overdue && state === "today" && "todo__due--today",
   ]
     .filter(Boolean)
     .join(" ");
@@ -213,18 +293,37 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
       </label>
       <div className="todo__body">
         {editing ? (
-          <input
-            type="text"
-            className="todo__edit"
-            // Focus moves here as the direct result of the user asking to edit.
-            autoFocus
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={() => void saveEdit()}
-            maxLength={TODO_TITLE_MAX_LENGTH}
-            aria-label="Edit todo title"
-          />
+          <div className="todo__edit-fields" onBlur={handleEditBlur}>
+            <input
+              type="text"
+              className="todo__edit"
+              // Focus moves here as the direct result of the user asking to edit.
+              autoFocus
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleKeyDown}
+              maxLength={TODO_TITLE_MAX_LENGTH}
+              aria-label="Edit todo title"
+            />
+            <span className="todo__edit-deadline">
+              <input
+                type="date"
+                className="todo__edit-date"
+                value={draftDate}
+                onChange={(event) => setDraftDate(event.target.value)}
+                onKeyDown={handleKeyDown}
+                aria-label="Edit deadline date"
+              />
+              <input
+                type="time"
+                className="todo__edit-time"
+                value={draftTime}
+                onChange={(event) => setDraftTime(event.target.value)}
+                onKeyDown={handleKeyDown}
+                aria-label="Edit deadline time"
+              />
+            </span>
+          </div>
         ) : editingDescription ? (
           <div className="todo__desc-edit">
             <textarea
@@ -269,6 +368,12 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
             <span className="todo__title" onDoubleClick={startEdit}>
               {title}
             </span>
+            {deadline ? (
+              <span className={dueClassName}>
+                <span className="todo__due-date">{formatDeadline(deadline)}</span>
+                {overdue ? <span className="todo__due-flag">Overdue</span> : null}
+              </span>
+            ) : null}
             {hasDescription ? (
               <div className="todo__desc">
                 <button
@@ -304,7 +409,33 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
           </>
         )}
       </div>
+      {editingTags ? (
+        <div className="todo__tags-editor">
+          <TagInput
+            label={`Tags for "${title}"`}
+            selected={todoTags}
+            availableTags={availableTags}
+            onChange={(next) => void saveTags(next)}
+            onCreated={onTagCreated}
+          />
+        </div>
+      ) : (
+        <TagChips tags={todoTags} onSelect={onFilterTag} />
+      )}
       <div className="todo__actions">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setEditingTags((value) => !value)}
+          aria-label={`Edit tags for "${title}"`}
+          aria-pressed={editingTags}
+          title={editingTags ? "Done editing tags" : "Edit tags"}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 11.5V5a2 2 0 0 1 2-2h6.5L21 12.5 12.5 21z" />
+            <path d="M7.5 7.5h.01" />
+          </svg>
+        </button>
         {editing || editingDescription ? null : (
           <>
             <button

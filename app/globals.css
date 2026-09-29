@@ -274,11 +274,19 @@ input {
 .add-todo {
   position: relative;
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  animation: fade-up 0.8s var(--ease-out) 0.3s both;
+}
+
+.add-todo__bar {
+  position: relative;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.4rem 0.4rem 1rem;
-  margin-bottom: 1.5rem;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -287,10 +295,9 @@ input {
     border-color 0.25s ease,
     box-shadow 0.35s var(--ease-out),
     transform 0.35s var(--ease-out);
-  animation: fade-up 0.8s var(--ease-out) 0.3s both;
 }
 
-.add-todo:focus-within {
+.add-todo__bar:focus-within {
   border-color: var(--peach);
   box-shadow:
     0 0 0 4px var(--accent-soft),
@@ -322,7 +329,7 @@ input {
   transform: rotate(90deg);
 }
 
-.add-todo:focus-within .add-todo__plus {
+.add-todo__bar:focus-within .add-todo__plus {
   color: var(--accent);
   transform: rotate(90deg);
 }
@@ -342,7 +349,7 @@ input {
 }
 
 /* Once the description field is revealed the pill opens up into a panel. */
-.add-todo--open {
+.add-todo__bar--open {
   align-items: center;
   border-radius: var(--radius);
   padding: 0.4rem 0.4rem 0.4rem 1rem;
@@ -440,10 +447,59 @@ input {
   position: relative;
 }
 
+.add-todo__deadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  padding: 0 0.4rem 0 1.1rem;
+  animation: fade-up 0.5s var(--ease-out) both;
+}
+
+.add-todo__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.add-todo__field-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.add-todo__date,
+.add-todo__time,
+.todo__edit-date,
+.todo__edit-time {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.3s var(--ease-out);
+}
+
+.add-todo__date:focus-visible,
+.add-todo__time:focus-visible,
+.todo__edit-date:focus-visible,
+.todo__edit-time:focus-visible {
+  border-color: var(--peach);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.add-todo__hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .add-todo__error {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  left: 1.1rem;
+  padding-left: 1.1rem;
   font-size: 0.85rem;
   color: var(--danger);
   animation: fade-up 0.35s var(--ease-out) both;
@@ -485,6 +541,56 @@ input {
   background: linear-gradient(90deg, var(--sage), var(--done));
   transform-origin: left center;
   transition: transform 0.7s var(--ease-out);
+}
+
+/* ---------- List header (progress + sort) ---------- */
+
+.list-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 0 0.25rem 1rem;
+  animation: fade-up 0.6s var(--ease-out) both;
+}
+
+.list-header .progress {
+  flex: 1;
+  min-width: 12rem;
+  margin: 0;
+}
+
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.sort__label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.sort__select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.3s var(--ease-out);
+}
+
+.sort__select:focus-visible {
+  border-color: var(--peach);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* ---------- List ---------- */
@@ -647,6 +753,10 @@ input {
 .todo__body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
 }
 
 /* The strikethrough is a line that sweeps across the text. */
@@ -679,6 +789,46 @@ input {
   background: var(--accent-soft);
   outline: none;
   animation: fade-in 0.2s ease both;
+}
+
+.todo__edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.todo__edit-deadline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  animation: fade-in 0.2s ease both;
+}
+
+/* Deadline badge on a todo row. */
+.todo__due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.todo__due--today {
+  color: var(--accent-deep);
+}
+
+.todo__due--overdue {
+  color: var(--danger);
+}
+
+.todo__due-flag {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 @keyframes fade-in {
@@ -1022,6 +1172,220 @@ input {
   background: var(--danger-soft);
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+/* ---------- Tags ---------- */
+
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  list-style: none;
+  flex-basis: 100%;
+}
+
+.todo__tags-editor {
+  flex-basis: 100%;
+  padding: 0.15rem 0.1rem 0.25rem calc(26px + 0.85rem);
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--butter);
+  border: 1px solid color-mix(in srgb, var(--line-strong) 70%, transparent);
+  border-radius: 999px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.tag-chip--button {
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+}
+
+.tag-chip--button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.tag-chip--button:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 1px;
+}
+
+.tag-chip__remove {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-right: -0.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.tag-chip__remove:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.tag-chip__remove:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+/* ---------- Tag input ---------- */
+
+.tag-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tag-input__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  list-style: none;
+}
+
+.tag-input__field {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--canvas) 60%, #fff);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  outline: none;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s var(--ease-out);
+}
+
+.tag-input__field:focus-visible {
+  border-color: var(--peach);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.tag-input__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  list-style: none;
+}
+
+.tag-input__option {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  background: #fff;
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.tag-input__option:hover {
+  background: var(--sage);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.tag-input__option--create {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent-deep);
+}
+
+.tag-input__option:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.tag-input__error {
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+/* ---------- Tag filter ---------- */
+
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+}
+
+.tag-filter__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  list-style: none;
+}
+
+.tag-filter__button {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.tag-filter__button:hover {
+  border-color: var(--peach);
+}
+
+.tag-filter__button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent-deep);
+}
+
+.tag-filter__button:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 1px;
+}
+
+.tag-filter__clear {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.tag-filter__clear:hover {
+  color: var(--accent-deep);
 }
 
 /* ---------- Motion preferences ---------- */

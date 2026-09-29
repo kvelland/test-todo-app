@@ -5,6 +5,17 @@ export type Todo = {
   title: string;
   description: string;
   completed: boolean;
+  /** PocketBase date string ("YYYY-MM-DD HH:mm:ss.SSSZ", UTC), or "" when the todo has no deadline. */
+  deadline: string;
+  created: string;
+  updated: string;
+  /** Relation ids pointing at records in the `tags` collection. */
+  tags: string[];
+};
+
+export type Tag = {
+  id: string;
+  name: string;
   created: string;
   updated: string;
 };

@@ -34,20 +34,23 @@ v0.40.4 as the backend. Read this whole file before planning or writing code.
 
 ## Layout
 
-| Path                             | What it is                                                          |
-| -------------------------------- | ------------------------------------------------------------------- |
-| `app/page.tsx`, `app/layout.tsx` | Page shell (server components). Fonts and backdrop live in layout.  |
-| `app/globals.css`                | All styles. Design tokens are CSS variables on `:root`.             |
-| `components/TodoApp.tsx`         | Client component that owns the todo list state.                     |
-| `components/AddTodoForm.tsx`     | New-todo input.                                                     |
-| `components/TodoList.tsx`        | List + empty state.                                                 |
-| `components/TodoItem.tsx`        | One todo: toggle, inline edit, delete.                              |
-| `lib/pocketbase.ts`              | The single PocketBase client (`pb`) and the `Todo` type.            |
-| `lib/todos.ts`                   | Data layer: `listTodos`, `createTodo`, `updateTodo`, `deleteTodo`.  |
-| `lib/validation.ts`              | `validateTodoTitle` — shared by add and edit.                       |
-| `pb_migrations/`                 | PocketBase JS migrations (schema).                                  |
-| `scripts/`                       | `download-pocketbase.sh`, `verify-todos.sh` (end-to-end API check). |
-| `.github/workflows/ci.yml`       | CI. Maintainer-owned — the Factory App cannot push workflow files.  |
+| Path                             | What it is                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `app/page.tsx`, `app/layout.tsx` | Page shell (server components). Fonts and backdrop live in layout.                          |
+| `app/globals.css`                | All styles. Design tokens are CSS variables on `:root`.                                     |
+| `components/TodoApp.tsx`         | Client component that owns the todo list state.                                             |
+| `components/AddTodoForm.tsx`     | New-todo input (title + tag picker).                                                        |
+| `components/TodoList.tsx`        | List + empty state.                                                                         |
+| `components/TodoItem.tsx`        | One todo: toggle, inline edit, tags, delete.                                                |
+| `components/TagInput.tsx`        | Tag chips + suggestion/create picker, reused by add and edit.                               |
+| `components/TagChips.tsx`        | Read-only tag chips shown on a todo (clickable to filter).                                  |
+| `components/TagFilter.tsx`       | Tag filter bar above the list.                                                              |
+| `lib/pocketbase.ts`              | The single PocketBase client (`pb`) and the `Todo`/`Tag` types.                             |
+| `lib/todos.ts`                   | Data layer: `listTodos`, `createTodo`, `updateTodo`, `deleteTodo`, `listTags`, `createTag`. |
+| `lib/validation.ts`              | `validateTodoTitle`, `validateTagName` — shared by add and edit.                            |
+| `pb_migrations/`                 | PocketBase JS migrations (schema).                                                          |
+| `scripts/`                       | `download-pocketbase.sh`, `verify-todos.sh` (end-to-end API check).                         |
+| `.github/workflows/ci.yml`       | CI. Maintainer-owned — the Factory App cannot push workflow files.                          |
 
 ## Contracts — follow these
 
@@ -63,19 +66,29 @@ v0.40.4 as the backend. Read this whole file before planning or writing code.
   `lib/todos.test.ts`.
 
 - **`Todo` type** comes from `lib/pocketbase.ts`: `id`, `title`, `description`, `completed`,
-  `created`, `updated`. `listTodos` returns newest first (`sort: "-created"`).
+  `deadline`, `tags` (array of `tags` record ids), `created`, `updated`. `listTodos` returns
+  newest first (`sort: "-created"`). `Tag` is `id`, `name`, `created`, `updated`; `listTags` sorts
+  by `name`.
 - **Titles** are validated with `validateTodoTitle` (trimmed, 1–200 chars, matching the
-  PocketBase schema). Reuse it; don't write another validator.
-- **Descriptions** are validated with `validateTodoDescription` (optional, trimmed, line breaks
-  kept, ≤ 2000 chars, matching the PocketBase schema). Reuse it; don't write another validator.
+  PocketBase schema). **Descriptions** use `validateTodoDescription` (optional, trimmed, line
+  breaks kept, ≤ 2000 chars, matching the PocketBase schema). **Tag names** use
+  `validateTagName(raw, existingNames)` (trimmed, 1–30 chars, case-insensitive uniqueness). Reuse
+  these; don't write another validator. `createTag` is idempotent: it returns the existing tag on a
+  case-insensitive match instead of creating a duplicate (the DB index on `tags.name` is
+  case-sensitive, so this check lives in the data layer).
 - **Schema changes** go in a _new_ file in `pb_migrations/` with a larger Unix-seconds prefix
   than existing ones. Never edit an existing migration. Keep `down` reversible.
-- **UI state:** `TodoApp` owns the list; children report changes via `onAdded` / `onChanged` /
-  `onDeleted`. Updates are optimistic with revert and an inline `role="alert"` error on failure.
+- **UI state:** `TodoApp` owns the todo list _and_ the tag list; children report changes via
+  `onAdded` / `onChanged` / `onDeleted` / `onTagCreated`. Updates are optimistic with revert and an
+  inline `role="alert"` error on failure. Tag filtering is client-side and OR-based (a todo matches
+  if it has any selected tag), over the fully-loaded list — it must stay composable with future
+  filters.
 - **Accessibility is part of the contract** — tests select by these, so keep them stable:
   input label `New todo title`, button `Add` / `Adding…`, checkbox `Mark "<title>" as complete`,
   `Edit "<title>"`, `Delete "<title>"`, edit input `Edit todo title`, `role="status"` while
-  loading, empty text `No todos yet`; for descriptions: textarea
+  loading, empty text `No todos yet`. Tags: add-form tag input label `Tags`, per-todo tag editor
+  `Tags for "<title>"` toggled by `Edit tags for "<title>"`, filter region `Filter by tag`, filter
+  and chip buttons `Filter by tag "<name>"`, filtered empty text `No todos match these tags`; for descriptions: textarea
   `New todo description`, textarea `Edit todo description`,
   `Show description for "<title>"` / `Hide description for "<title>"`,
   `Add description for "<title>"` / `Edit description for "<title>"`,
