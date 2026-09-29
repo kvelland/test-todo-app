@@ -5,3 +5,5 @@ build
 coverage
 package-lock.json
 next-env.d.ts
+pb_data
+pocketbase

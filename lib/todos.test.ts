@@ -34,10 +34,7 @@ beforeEach(() => {
 
 describe("listTodos", () => {
   it("returns ok with the records", async () => {
-    const records = [
-      todo(),
-      todo({ id: "rec2", title: "Walk the dog", completed: true }),
-    ];
+    const records = [todo(), todo({ id: "rec2", title: "Walk the dog", completed: true })];
     collection.getFullList.mockResolvedValue(records);
 
     await expect(listTodos()).resolves.toEqual({ ok: true, data: records });

@@ -1,9 +1,7 @@
 import { ClientResponseError } from "pocketbase";
 import { pb, type Todo } from "./pocketbase";
 
-export type Result<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 const COLLECTION = "todos";
 
@@ -43,9 +41,7 @@ export async function listTodos(): Promise<Result<Todo[]>> {
 
 export async function createTodo(title: string): Promise<Result<Todo>> {
   try {
-    const record = await pb
-      .collection(COLLECTION)
-      .create<Todo>({ title, completed: false });
+    const record = await pb.collection(COLLECTION).create<Todo>({ title, completed: false });
     return { ok: true, data: record };
   } catch (error) {
     return { ok: false, error: toError(error) };
