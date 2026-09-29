@@ -30,6 +30,35 @@ describe("linkifyDescription", () => {
     ]);
   });
 
+  it("keeps surrounding quotes out of the href", () => {
+    expect(linkifyDescription('See "https://example.com/x" for details.')).toEqual([
+      { type: "text", value: 'See "' },
+      { type: "link", value: "https://example.com/x", href: "https://example.com/x" },
+      { type: "text", value: '" for details.' },
+    ]);
+  });
+
+  it("keeps enclosing brackets out of the href", () => {
+    expect(linkifyDescription("[https://example.com] (https://example.org/a).")).toEqual([
+      { type: "text", value: "[" },
+      { type: "link", value: "https://example.com", href: "https://example.com" },
+      { type: "text", value: "] (" },
+      { type: "link", value: "https://example.org/a", href: "https://example.org/a" },
+      { type: "text", value: ")." },
+    ]);
+  });
+
+  it("keeps balanced parentheses inside the URL", () => {
+    const url = "https://en.wikipedia.org/wiki/Function_(mathematics)";
+    expect(linkifyDescription(`see ${url}, and (${url})`)).toEqual([
+      { type: "text", value: "see " },
+      { type: "link", value: url, href: url },
+      { type: "text", value: ", and (" },
+      { type: "link", value: url, href: url },
+      { type: "text", value: ")" },
+    ]);
+  });
+
   it("finds multiple URLs", () => {
     expect(linkifyDescription("https://a.test and https://b.test")).toEqual([
       { type: "link", value: "https://a.test", href: "https://a.test" },
