@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+coverage/
+pb_data/
+*.tsbuildinfo
+.artifacts/
+
+.env
+.env.local
+*.log
+.DS_Store
