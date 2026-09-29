@@ -3,6 +3,7 @@ import PocketBase from "pocketbase";
 export type Todo = {
   id: string;
   title: string;
+  description: string;
   completed: boolean;
   /** PocketBase date string ("YYYY-MM-DD HH:mm:ss.SSSZ", UTC), or "" when the todo has no deadline. */
   deadline: string;

@@ -7,6 +7,7 @@ function todo(id: string, deadline: string, created: string): Todo {
   return {
     id,
     title: `Todo ${id}`,
+    description: "",
     completed: false,
     deadline,
     created,

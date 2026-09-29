@@ -110,3 +110,28 @@ export function validateDeadline(
 
   return { ok: true, value: combineDeadline(date, time || null, options.timeZone) };
 }
+
+export const TODO_DESCRIPTION_MAX_LENGTH = 2000;
+/** Show a character counter once a draft gets this close to the limit. */
+export const TODO_DESCRIPTION_COUNTER_THRESHOLD = TODO_DESCRIPTION_MAX_LENGTH - 200;
+
+export type DescriptionValidation = { ok: true; value: string } | { ok: false; error: string };
+
+/**
+ * Normalises and validates a todo description. Optional: an empty (or
+ * whitespace-only) description is valid and normalises to "". Leading and
+ * trailing whitespace is trimmed, but interior line breaks are preserved so the
+ * saved text keeps its shape. Mirror of the PocketBase schema field.
+ */
+export function validateTodoDescription(raw: string): DescriptionValidation {
+  const value = raw.trim();
+
+  if (value.length > TODO_DESCRIPTION_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `Description must be ${TODO_DESCRIPTION_MAX_LENGTH} characters or fewer.`,
+    };
+  }
+
+  return { ok: true, value };
+}

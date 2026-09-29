@@ -40,7 +40,7 @@ fi
 
 record="$(curl -sf -X POST "${base}/api/collections/todos/records" \
   -H 'Content-Type: application/json' \
-  -d '{"title":"verify"}')"
+  -d '{"title":"verify","description":"line one\nline two"}')"
 
 echo "$record" | node -e '
 let d = "";
@@ -49,10 +49,27 @@ process.stdin.on("data", (c) => (d += c)).on("end", () => {
   const fail = (m) => { console.error("FAIL: " + m); process.exit(1); };
   if (r.collectionName !== "todos") fail("wrong collection");
   if (r.title !== "verify") fail("title not echoed");
+  if (r.description !== "line one\nline two") fail("description not echoed with line breaks");
   if (r.completed !== false) fail("completed did not default to false");
   if (r.deadline !== "") fail("deadline did not default to an empty string");
   if (!r.created) fail("created is empty");
   if (!r.updated) fail("updated is empty");
+});
+'
+
+# A todo without a description reads back as an empty string, not null.
+bare="$(curl -sf -X POST "${base}/api/collections/todos/records" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"verify-bare"}')"
+
+echo "$bare" | node -e '
+let d = "";
+process.stdin.on("data", (c) => (d += c)).on("end", () => {
+  const r = JSON.parse(d);
+  if (r.description !== "") {
+    console.error("FAIL: missing description did not default to an empty string");
+    process.exit(1);
+  }
 });
 '
 
@@ -126,4 +143,4 @@ process.stdin.on("data", (c) => (d += c)).on("end", () => {
 });
 '
 
-echo "OK: todos + tags collections created; record create, list, deadline round-trip, and tag filter verified"
+echo "OK: todos + tags collections created; record create, list, deadline and description round-trip, and tag filter verified"

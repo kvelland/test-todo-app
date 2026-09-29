@@ -28,6 +28,7 @@ function todo(overrides: Partial<Todo> = {}): Todo {
   return {
     id: "rec1",
     title: "Buy milk",
+    description: "",
     completed: false,
     deadline: "",
     created: "2026-01-01 00:00:00.000Z",
@@ -88,6 +89,24 @@ describe("createTodo", () => {
     });
     expect(collection.create).toHaveBeenCalledWith({
       title: "Read a book",
+      description: "",
+      completed: false,
+      deadline: "",
+      tags: [],
+    });
+  });
+
+  it("sends a description when one is provided", async () => {
+    const created = todo({ id: "new2", title: "Read a book", description: "Science fiction" });
+    collection.create.mockResolvedValue(created);
+
+    await expect(createTodo("Read a book", null, [], "Science fiction")).resolves.toEqual({
+      ok: true,
+      data: created,
+    });
+    expect(collection.create).toHaveBeenCalledWith({
+      title: "Read a book",
+      description: "Science fiction",
       completed: false,
       deadline: "",
       tags: [],
@@ -104,6 +123,7 @@ describe("createTodo", () => {
     });
     expect(collection.create).toHaveBeenCalledWith({
       title: "Read a book",
+      description: "",
       completed: false,
       deadline: "",
       tags: ["tag1"],
@@ -118,6 +138,7 @@ describe("createTodo", () => {
     await expect(createTodo("Post form", deadline)).resolves.toEqual({ ok: true, data: created });
     expect(collection.create).toHaveBeenCalledWith({
       title: "Post form",
+      description: "",
       completed: false,
       deadline,
       tags: [],
@@ -131,6 +152,7 @@ describe("createTodo", () => {
 
     expect(collection.create).toHaveBeenCalledWith({
       title: "No deadline",
+      description: "",
       completed: false,
       deadline: "",
       tags: [],
@@ -204,6 +226,17 @@ describe("updateTodo", () => {
       data: updated,
     });
     expect(collection.update).toHaveBeenCalledWith("rec1", { completed: true });
+  });
+
+  it("sends a description patch", async () => {
+    const updated = todo({ description: "Two bottles" });
+    collection.update.mockResolvedValue(updated);
+
+    await expect(updateTodo("rec1", { description: "Two bottles" })).resolves.toEqual({
+      ok: true,
+      data: updated,
+    });
+    expect(collection.update).toHaveBeenCalledWith("rec1", { description: "Two bottles" });
   });
 
   it("sends a tags patch and returns the updated record", async () => {

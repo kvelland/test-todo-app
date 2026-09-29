@@ -49,7 +49,12 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) to list, add, complete, edit
 (Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos, to
 set deadlines and sort the list — see [Deadlines and sorting](#deadlines-and-sorting) — and to
-label todos with tags. Type into the tag field to add an existing tag or create a new one, click a
+label todos with tags (see below). A todo can also carry an optional description (up to 2,000
+characters, line breaks kept): reveal the field with **Add description** when creating, or use the
+description button on a todo to add, edit, or clear one. Todos with a description show a dot and a
+one-line preview that expands to the full text, where `http`/`https` links are clickable.
+
+To tag a todo, type into the tag field to add an existing tag or create a new one, click a
 tag chip on a todo to filter by it, and use the filter bar above the list to select one or more
 tags (a todo matches if it has any of them). "Clear filter" returns to the full list.
 
@@ -119,15 +124,16 @@ the existing file.
 
 ### Schema — `todos`
 
-| Field       | Type     | Rules                                |
-| ----------- | -------- | ------------------------------------ |
-| `id`        | text     | system, auto-generated               |
-| `title`     | text     | required, max 200 chars              |
-| `completed` | bool     | default `false`                      |
-| `deadline`  | date     | optional; empty string = no deadline |
-| `tags`      | relation | zero or more `tags` records          |
-| `created`   | autodate | set on create                        |
-| `updated`   | autodate | set on create and update             |
+| Field         | Type     | Rules                                |
+| ------------- | -------- | ------------------------------------ |
+| `id`          | text     | system, auto-generated               |
+| `title`       | text     | required, max 200 chars              |
+| `description` | text     | optional, max 2000 chars, `""`       |
+| `completed`   | bool     | default `false`                      |
+| `deadline`    | date     | optional; empty string = no deadline |
+| `tags`        | relation | zero or more `tags` records          |
+| `created`     | autodate | set on create                        |
+| `updated`     | autodate | set on create and update             |
 
 ### Schema — `tags`
 

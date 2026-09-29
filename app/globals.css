@@ -348,6 +348,55 @@ input {
   color: var(--muted);
 }
 
+/* Once the description field is revealed the pill opens up into a panel. */
+.add-todo__bar--open {
+  align-items: center;
+  border-radius: var(--radius);
+  padding: 0.4rem 0.4rem 0.4rem 1rem;
+}
+
+.add-todo__desc-toggle {
+  flex-shrink: 0;
+}
+
+.add-todo__desc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-basis: 100%;
+  margin-top: 0.15rem;
+  padding: 0 0 0.2rem;
+}
+
+.add-todo__desc-input {
+  width: 100%;
+  min-height: 4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-family: inherit;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.add-todo__desc-input:focus-visible {
+  border-color: var(--peach);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.add-todo__desc-count {
+  align-self: flex-end;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .add-todo__button {
   position: relative;
   overflow: hidden;
@@ -786,6 +835,150 @@ input {
   from {
     opacity: 0;
   }
+}
+
+/* Description: one-line preview that expands to the full text. */
+.todo__desc {
+  margin-top: 0.15rem;
+}
+
+.todo__desc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.1rem 0.25rem;
+  margin-left: -0.25rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.todo__desc-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--ink-soft);
+}
+
+.todo__desc-toggle:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 1px;
+}
+
+.todo__desc-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.todo--completed .todo__desc-dot {
+  background: var(--done);
+}
+
+.todo__desc-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.todo__desc-text {
+  margin-top: 0.3rem;
+  padding-left: 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: fade-in 0.2s ease both;
+}
+
+.todo__desc-text a {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Description editor: a textarea, because line breaks are kept. */
+.todo__desc-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  animation: fade-in 0.2s ease both;
+}
+
+.todo__desc-input {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: inherit;
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.todo__desc-input:focus-visible {
+  border-color: var(--peach);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.todo__desc-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.todo__desc-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.todo__desc-buttons {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.text-button {
+  padding: 0.25rem 0.6rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.text-button:hover {
+  background: var(--accent-soft);
+}
+
+.text-button:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 1px;
 }
 
 .todo__actions {

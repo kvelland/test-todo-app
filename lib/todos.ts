@@ -44,10 +44,12 @@ export async function createTodo(
   title: string,
   deadline?: string | null,
   tags: string[] = [],
+  description = "",
 ): Promise<Result<Todo>> {
   try {
     const record = await pb.collection(COLLECTION).create<Todo>({
       title,
+      description,
       completed: false,
       deadline: deadline ?? "",
       tags,
@@ -60,7 +62,7 @@ export async function createTodo(
 
 export async function updateTodo(
   id: string,
-  patch: Partial<Pick<Todo, "title" | "completed" | "deadline" | "tags">>,
+  patch: Partial<Pick<Todo, "title" | "completed" | "description" | "deadline" | "tags">>,
 ): Promise<Result<Todo>> {
   try {
     const record = await pb.collection(COLLECTION).update<Todo>(id, patch);

@@ -1,9 +1,10 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { combineDeadline, formatDeadline } from "@/lib/deadline";
 import type { Tag, Todo } from "@/lib/pocketbase";
 import * as todos from "@/lib/todos";
+import { TODO_DESCRIPTION_MAX_LENGTH } from "@/lib/validation";
 import TodoApp from "./TodoApp";
 
 vi.mock("@/lib/todos", () => ({
@@ -19,6 +20,7 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
   return {
     id: "1",
     title: "Buy milk",
+    description: "",
     completed: false,
     deadline: "",
     created: "2026-01-01 00:00:00.000Z",
@@ -97,7 +99,7 @@ describe("TodoApp add", () => {
     const input = screen.getByLabelText("New todo title");
     await user.type(input, "  Write tests  {Enter}");
 
-    expect(todos.createTodo).toHaveBeenCalledWith("Write tests", null, []);
+    expect(todos.createTodo).toHaveBeenCalledWith("Write tests", null, [], "");
     const items = await screen.findAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Write tests");
     expect(input).toHaveValue("");
@@ -132,7 +134,7 @@ describe("TodoApp add", () => {
     expect(screen.getByRole("button", { name: "Adding…" })).toBeInTheDocument();
 
     await user.type(input, "Second{Enter}");
-    expect(todos.createTodo).toHaveBeenNthCalledWith(2, "Second", null, []);
+    expect(todos.createTodo).toHaveBeenNthCalledWith(2, "Second", null, [], "");
 
     resolveFirst({ ok: true, data: makeTodo({ id: "1", title: "First" }) });
     expect(await screen.findByText("First")).toBeInTheDocument();
@@ -169,6 +171,93 @@ describe("TodoApp add", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("title: Cannot be blank.");
     expect(input).toHaveValue("Oops");
+  });
+});
+
+describe("TodoApp add with description", () => {
+  it("hides the description field until it is revealed", async () => {
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [] });
+
+    render(<TodoApp />);
+    await screen.findByText("No todos yet");
+
+    const toggle = screen.getByRole("button", { name: "Add description" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("New todo description")).not.toBeInTheDocument();
+  });
+
+  it("sends a description when one is entered", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [] });
+    vi.mocked(todos.createTodo).mockResolvedValue({
+      ok: true,
+      data: makeTodo({ description: "Two bottles" }),
+    });
+
+    render(<TodoApp />);
+    await screen.findByText("No todos yet");
+
+    await user.click(screen.getByRole("button", { name: "Add description" }));
+    await user.type(screen.getByLabelText("New todo title"), "Buy milk");
+    await user.type(screen.getByLabelText("New todo description"), "Two bottles");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(todos.createTodo).toHaveBeenCalledWith("Buy milk", null, [], "Two bottles");
+    expect(screen.getByLabelText("New todo description")).toHaveValue("");
+  });
+
+  it("rejects an over-limit description without calling the API", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [] });
+
+    render(<TodoApp />);
+    await screen.findByText("No todos yet");
+
+    await user.click(screen.getByRole("button", { name: "Add description" }));
+    await user.type(screen.getByLabelText("New todo title"), "Buy milk");
+    fireEvent.change(screen.getByLabelText("New todo description"), {
+      target: { value: "x".repeat(TODO_DESCRIPTION_MAX_LENGTH + 1) },
+    });
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Description must be 2000 characters or fewer.",
+    );
+    expect(todos.createTodo).not.toHaveBeenCalled();
+  });
+
+  it("shows a character counter near the limit", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [] });
+
+    render(<TodoApp />);
+    await screen.findByText("No todos yet");
+
+    await user.click(screen.getByRole("button", { name: "Add description" }));
+    const field = screen.getByLabelText("New todo description");
+    fireEvent.change(field, { target: { value: "x".repeat(TODO_DESCRIPTION_MAX_LENGTH - 10) } });
+
+    expect(screen.getByText("1990/2000")).toBeInTheDocument();
+  });
+
+  it("restores the description when creating fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [] });
+    vi.mocked(todos.createTodo).mockResolvedValue({
+      ok: false,
+      error: "title: Cannot be blank.",
+    });
+
+    render(<TodoApp />);
+    await screen.findByText("No todos yet");
+
+    await user.click(screen.getByRole("button", { name: "Add description" }));
+    await user.type(screen.getByLabelText("New todo title"), "Oops");
+    await user.type(screen.getByLabelText("New todo description"), "details");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("title: Cannot be blank.");
+    expect(screen.getByLabelText("New todo description")).toHaveValue("details");
   });
 });
 
@@ -376,6 +465,196 @@ describe("TodoApp edit", () => {
   });
 });
 
+describe("TodoApp description display", () => {
+  it("shows a one-line preview that expands to the full text", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo({ description: "line one\nline two" })],
+    });
+
+    render(<TodoApp />);
+
+    const toggle = await screen.findByRole("button", {
+      name: 'Show description for "Buy milk"',
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("line one");
+    expect(screen.queryByText(/line one\s+line two/)).not.toBeInTheDocument();
+
+    await user.click(toggle);
+
+    const expanded = screen.getByRole("button", {
+      name: 'Hide description for "Buy milk"',
+    });
+    expect(expanded).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/line one\s+line two/)).toBeInTheDocument();
+  });
+
+  it("renders URLs as links that open in a new tab", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo({ description: "see https://example.com/post for details" })],
+    });
+
+    render(<TodoApp />);
+    await user.click(
+      await screen.findByRole("button", { name: 'Show description for "Buy milk"' }),
+    );
+
+    const link = screen.getByRole("link", { name: "https://example.com/post" });
+    expect(link).toHaveAttribute("href", "https://example.com/post");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("leaves todos without a description unchanged", async () => {
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo()],
+    });
+
+    render(<TodoApp />);
+    await screen.findByText("Buy milk");
+
+    expect(
+      screen.queryByRole("button", { name: 'Show description for "Buy milk"' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: 'Add description for "Buy milk"' }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("TodoApp description edit", () => {
+  function setup(todo: Todo = makeTodo()) {
+    vi.mocked(todos.listTodos).mockResolvedValue({ ok: true, data: [todo] });
+    render(<TodoApp />);
+    return userEvent.setup();
+  }
+
+  it("adds a description and shows it in the list", async () => {
+    const user = setup();
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: true,
+      data: makeTodo({ description: "Two bottles" }),
+    });
+
+    await user.click(await screen.findByRole("button", { name: 'Add description for "Buy milk"' }));
+    const textarea = screen.getByLabelText("Edit todo description");
+    expect(textarea).toHaveFocus();
+    await user.type(textarea, "Two bottles");
+    await user.click(screen.getByRole("button", { name: 'Save description for "Buy milk"' }));
+
+    expect(todos.updateTodo).toHaveBeenCalledTimes(1);
+    expect(todos.updateTodo).toHaveBeenCalledWith("1", { description: "Two bottles" });
+    expect(
+      await screen.findByRole("button", { name: 'Show description for "Buy milk"' }),
+    ).toHaveTextContent("Two bottles");
+  });
+
+  it("keeps line breaks and does not save on Enter", async () => {
+    const user = setup();
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: true,
+      data: makeTodo({ description: "line one\nline two" }),
+    });
+
+    await user.click(await screen.findByRole("button", { name: 'Add description for "Buy milk"' }));
+    const textarea = screen.getByLabelText("Edit todo description");
+    await user.type(textarea, "line one{Enter}line two");
+
+    expect(todos.updateTodo).not.toHaveBeenCalled();
+    expect(textarea).toHaveValue("line one\nline two");
+
+    await user.click(screen.getByRole("button", { name: 'Save description for "Buy milk"' }));
+
+    expect(todos.updateTodo).toHaveBeenCalledWith("1", { description: "line one\nline two" });
+  });
+
+  it("trims the description and clears it when emptied", async () => {
+    const user = setup(makeTodo({ description: "Old notes" }));
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: true,
+      data: makeTodo({ description: "" }),
+    });
+
+    await user.click(
+      await screen.findByRole("button", { name: 'Edit description for "Buy milk"' }),
+    );
+    const textarea = screen.getByLabelText("Edit todo description");
+    await user.clear(textarea);
+    await user.click(screen.getByRole("button", { name: 'Save description for "Buy milk"' }));
+
+    expect(todos.updateTodo).toHaveBeenCalledWith("1", { description: "" });
+    expect(
+      await screen.findByRole("button", { name: 'Add description for "Buy milk"' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: 'Show description for "Buy milk"' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("cancels on Escape without saving", async () => {
+    const user = setup(makeTodo({ description: "Old notes" }));
+
+    await user.click(
+      await screen.findByRole("button", { name: 'Edit description for "Buy milk"' }),
+    );
+    const textarea = screen.getByLabelText("Edit todo description");
+    await user.clear(textarea);
+    await user.type(textarea, "Something else{Escape}");
+
+    expect(todos.updateTodo).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: 'Show description for "Buy milk"' }),
+    ).toHaveTextContent("Old notes");
+  });
+
+  it("skips the request when the description is unchanged", async () => {
+    const user = setup(makeTodo({ description: "Old notes" }));
+
+    await user.click(
+      await screen.findByRole("button", { name: 'Edit description for "Buy milk"' }),
+    );
+    await user.click(screen.getByRole("button", { name: 'Save description for "Buy milk"' }));
+
+    expect(todos.updateTodo).not.toHaveBeenCalled();
+  });
+
+  it("reverts the description and shows an error when saving fails", async () => {
+    const user = setup();
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: false,
+      error: "Network unreachable",
+    });
+
+    await user.click(await screen.findByRole("button", { name: 'Add description for "Buy milk"' }));
+    await user.type(screen.getByLabelText("Edit todo description"), "Two bottles");
+    await user.click(screen.getByRole("button", { name: 'Save description for "Buy milk"' }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save: Network unreachable",
+    );
+    expect(
+      screen.queryByRole("button", { name: 'Show description for "Buy milk"' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a character counter once the draft nears the limit", async () => {
+    const user = setup();
+
+    await user.click(await screen.findByRole("button", { name: 'Add description for "Buy milk"' }));
+    const textarea = screen.getByLabelText("Edit todo description");
+    expect(screen.queryByText("0/2000")).not.toBeInTheDocument();
+
+    fireEvent.change(textarea, { target: { value: "a".repeat(1800) } });
+
+    expect(screen.getByText("1800/2000")).toBeInTheDocument();
+  });
+});
+
 describe("TodoApp tags", () => {
   const work = makeTag();
   const home = makeTag({ id: "tag2", name: "Home" });
@@ -421,7 +700,7 @@ describe("TodoApp tags", () => {
     await user.type(screen.getByLabelText("New todo title"), "Buy milk");
     await user.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(todos.createTodo).toHaveBeenCalledWith("Buy milk", null, [work.id]);
+    expect(todos.createTodo).toHaveBeenCalledWith("Buy milk", null, [work.id], "");
     const item = (await screen.findByText("Buy milk")).closest("li")!;
     expect(within(item).getByText("Work")).toBeInTheDocument();
   });
@@ -598,6 +877,7 @@ describe("TodoApp deadlines", () => {
       "Ship it",
       combineDeadline("2027-01-15", null),
       [],
+      "",
     );
     expect(screen.getByLabelText("Deadline date")).toHaveValue("");
   });

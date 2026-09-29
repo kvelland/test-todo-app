@@ -65,14 +65,17 @@ v0.40.4 as the backend. Read this whole file before planning or writing code.
   If you need a new query, add a function to `lib/todos.ts` in the same style, with tests in
   `lib/todos.test.ts`.
 
-- **`Todo` type** comes from `lib/pocketbase.ts`: `id`, `title`, `completed`, `tags` (array of
-  `tags` record ids), `created`, `updated`. `listTodos` returns newest first (`sort: "-created"`).
-  `Tag` is `id`, `name`, `created`, `updated`; `listTags` sorts by `name`.
+- **`Todo` type** comes from `lib/pocketbase.ts`: `id`, `title`, `description`, `completed`,
+  `deadline`, `tags` (array of `tags` record ids), `created`, `updated`. `listTodos` returns
+  newest first (`sort: "-created"`). `Tag` is `id`, `name`, `created`, `updated`; `listTags` sorts
+  by `name`.
 - **Titles** are validated with `validateTodoTitle` (trimmed, 1–200 chars, matching the
-  PocketBase schema). **Tag names** use `validateTagName(raw, existingNames)` (trimmed, 1–30 chars,
-  case-insensitive uniqueness). Reuse these; don't write another validator. `createTag` is
-  idempotent: it returns the existing tag on a case-insensitive match instead of creating a
-  duplicate (the DB index on `tags.name` is case-sensitive, so this check lives in the data layer).
+  PocketBase schema). **Descriptions** use `validateTodoDescription` (optional, trimmed, line
+  breaks kept, ≤ 2000 chars, matching the PocketBase schema). **Tag names** use
+  `validateTagName(raw, existingNames)` (trimmed, 1–30 chars, case-insensitive uniqueness). Reuse
+  these; don't write another validator. `createTag` is idempotent: it returns the existing tag on a
+  case-insensitive match instead of creating a duplicate (the DB index on `tags.name` is
+  case-sensitive, so this check lives in the data layer).
 - **Schema changes** go in a _new_ file in `pb_migrations/` with a larger Unix-seconds prefix
   than existing ones. Never edit an existing migration. Keep `down` reversible.
 - **UI state:** `TodoApp` owns the todo list _and_ the tag list; children report changes via
@@ -85,7 +88,11 @@ v0.40.4 as the backend. Read this whole file before planning or writing code.
   `Edit "<title>"`, `Delete "<title>"`, edit input `Edit todo title`, `role="status"` while
   loading, empty text `No todos yet`. Tags: add-form tag input label `Tags`, per-todo tag editor
   `Tags for "<title>"` toggled by `Edit tags for "<title>"`, filter region `Filter by tag`, filter
-  and chip buttons `Filter by tag "<name>"`, filtered empty text `No todos match these tags`.
+  and chip buttons `Filter by tag "<name>"`, filtered empty text `No todos match these tags`; for descriptions: textarea
+  `New todo description`, textarea `Edit todo description`,
+  `Show description for "<title>"` / `Hide description for "<title>"`,
+  `Add description for "<title>"` / `Edit description for "<title>"`,
+  `Save description for "<title>"`, `Cancel description for "<title>"`.
 - **Styling:** plain CSS in `app/globals.css` using the existing tokens (`--accent`, `--done`,
   `--ink`, …). No Tailwind or CSS-in-JS. Light theme only. Any new animation must be covered
   by the `prefers-reduced-motion` block.
