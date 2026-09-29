@@ -1,9 +1,10 @@
 import { ClientResponseError } from "pocketbase";
-import { pb, type Todo } from "./pocketbase";
+import { pb, type Tag, type Todo } from "./pocketbase";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 const COLLECTION = "todos";
+const TAGS_COLLECTION = "tags";
 
 function toError(error: unknown): string {
   if (error instanceof ClientResponseError) {
@@ -39,9 +40,9 @@ export async function listTodos(): Promise<Result<Todo[]>> {
   }
 }
 
-export async function createTodo(title: string): Promise<Result<Todo>> {
+export async function createTodo(title: string, tags: string[] = []): Promise<Result<Todo>> {
   try {
-    const record = await pb.collection(COLLECTION).create<Todo>({ title, completed: false });
+    const record = await pb.collection(COLLECTION).create<Todo>({ title, completed: false, tags });
     return { ok: true, data: record };
   } catch (error) {
     return { ok: false, error: toError(error) };
@@ -50,10 +51,40 @@ export async function createTodo(title: string): Promise<Result<Todo>> {
 
 export async function updateTodo(
   id: string,
-  patch: Partial<Pick<Todo, "title" | "completed">>,
+  patch: Partial<Pick<Todo, "title" | "completed" | "tags">>,
 ): Promise<Result<Todo>> {
   try {
     const record = await pb.collection(COLLECTION).update<Todo>(id, patch);
+    return { ok: true, data: record };
+  } catch (error) {
+    return { ok: false, error: toError(error) };
+  }
+}
+
+export async function listTags(): Promise<Result<Tag[]>> {
+  try {
+    const records = await pb.collection(TAGS_COLLECTION).getFullList<Tag>({ sort: "name" });
+    return { ok: true, data: records };
+  } catch (error) {
+    return { ok: false, error: toError(error) };
+  }
+}
+
+/**
+ * Creates a tag, or returns the existing one when a tag with the same name (ignoring
+ * case) is already present. The database's unique index is case-sensitive, so this
+ * application-side check keeps tag names unique case-insensitively.
+ */
+export async function createTag(name: string): Promise<Result<Tag>> {
+  try {
+    const trimmed = name.trim();
+    const existing = await pb.collection(TAGS_COLLECTION).getFullList<Tag>();
+    const match = existing.find((tag) => tag.name.toLowerCase() === trimmed.toLowerCase());
+    if (match) {
+      return { ok: true, data: match };
+    }
+
+    const record = await pb.collection(TAGS_COLLECTION).create<Tag>({ name: trimmed });
     return { ok: true, data: record };
   } catch (error) {
     return { ok: false, error: toError(error) };

@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Todo } from "@/lib/pocketbase";
+import type { Tag, Todo } from "@/lib/pocketbase";
 import { deleteTodo, updateTodo } from "@/lib/todos";
 import { TODO_TITLE_MAX_LENGTH, validateTodoTitle } from "@/lib/validation";
+import TagChips from "./TagChips";
+import TagInput from "./TagInput";
 
 const LEAVE_MS = 280;
 
@@ -21,16 +23,31 @@ type TodoItemProps = {
   index?: number;
   onChanged: (todo: Todo) => void;
   onDeleted: (id: string) => void;
+  /** All known tags, used to resolve this todo's tag ids to names. */
+  availableTags?: Tag[];
+  onTagCreated?: (tag: Tag) => void;
+  /** Applies a tag to the list filter; makes the chips clickable. */
+  onFilterTag?: (tagId: string) => void;
 };
 
-export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: TodoItemProps) {
+export default function TodoItem({
+  todo,
+  index = 0,
+  onChanged,
+  onDeleted,
+  availableTags = [],
+  onTagCreated,
+  onFilterTag,
+}: TodoItemProps) {
   // Optimistic values shown while a save is in flight; null means "use the saved todo".
   const [optimisticCompleted, setOptimisticCompleted] = useState<boolean | null>(null);
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
+  const [optimisticTags, setOptimisticTags] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingTags, setEditingTags] = useState(false);
   const [draft, setDraft] = useState(todo.title);
   // Guards against Enter/Escape and the blur that follows both committing.
   const committedRef = useRef(false);
@@ -38,6 +55,8 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   const completed = optimisticCompleted ?? todo.completed;
   const title = optimisticTitle ?? todo.title;
   const toggling = optimisticCompleted !== null;
+  const tagIds = optimisticTags ?? todo.tags;
+  const todoTags = availableTags.filter((tag) => tagIds.includes(tag.id));
 
   async function handleToggle() {
     const next = !completed;
@@ -112,6 +131,21 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     }
   }
 
+  async function saveTags(next: Tag[]) {
+    const nextIds = next.map((tag) => tag.id);
+    setError(null);
+    setOptimisticTags(nextIds);
+
+    const result = await updateTodo(todo.id, { tags: nextIds });
+
+    setOptimisticTags(null);
+    if (result.ok) {
+      onChanged(result.data);
+    } else {
+      setError(`Could not save: ${result.error}`);
+    }
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -169,7 +203,33 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
           </span>
         )}
       </div>
+      {editingTags ? (
+        <div className="todo__tags-editor">
+          <TagInput
+            label={`Tags for "${title}"`}
+            selected={todoTags}
+            availableTags={availableTags}
+            onChange={(next) => void saveTags(next)}
+            onCreated={onTagCreated}
+          />
+        </div>
+      ) : (
+        <TagChips tags={todoTags} onSelect={onFilterTag} />
+      )}
       <div className="todo__actions">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setEditingTags((value) => !value)}
+          aria-label={`Edit tags for "${title}"`}
+          aria-pressed={editingTags}
+          title={editingTags ? "Done editing tags" : "Edit tags"}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 11.5V5a2 2 0 0 1 2-2h6.5L21 12.5 12.5 21z" />
+            <path d="M7.5 7.5h.01" />
+          </svg>
+        </button>
         {editing ? null : (
           <button
             type="button"

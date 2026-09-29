@@ -47,7 +47,10 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to list, add, complete, edit
-(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos.
+(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos. Todos can also
+be labelled with tags: type into the tag field to add an existing tag or create a new one, click a
+tag chip on a todo to filter by it, and use the filter bar above the list to select one or more
+tags (a todo matches if it has any of them). "Clear filter" returns to the full list.
 
 ## Scripts
 
@@ -91,16 +94,31 @@ the existing file.
 
 ### Schema — `todos`
 
-| Field       | Type     | Rules                    |
-| ----------- | -------- | ------------------------ |
-| `id`        | text     | system, auto-generated   |
-| `title`     | text     | required, max 200 chars  |
-| `completed` | bool     | default `false`          |
-| `created`   | autodate | set on create            |
-| `updated`   | autodate | set on create and update |
+| Field       | Type     | Rules                       |
+| ----------- | -------- | --------------------------- |
+| `id`        | text     | system, auto-generated      |
+| `title`     | text     | required, max 200 chars     |
+| `completed` | bool     | default `false`             |
+| `tags`      | relation | zero or more `tags` records |
+| `created`   | autodate | set on create               |
+| `updated`   | autodate | set on create and update    |
 
-API rules for `todos` are currently **public** (empty rules): list, view, create, update, and
-delete all work without authentication — this is a single-user setup for now. Authentication is a
+### Schema — `tags`
+
+| Field     | Type     | Rules                                |
+| --------- | -------- | ------------------------------------ |
+| `id`      | text     | system, auto-generated               |
+| `name`    | text     | required, max 30 chars, unique index |
+| `created` | autodate | set on create                        |
+| `updated` | autodate | set on create and update             |
+
+Tag names are unique **case-insensitively in the app** (`Work` and `work` are the same tag); the
+database index on `name` is case-sensitive, so `createTag` in `lib/todos.ts` checks for an existing
+match before inserting and returns the existing tag when one exists. Tagging is current-only: a
+todo can hold any number of tags, but tags cannot be renamed or deleted yet (a separate issue).
+
+API rules for `todos` and `tags` are currently **public** (empty rules): list, view, create, update,
+and delete all work without authentication — this is a single-user setup for now. Authentication is a
 later round; do not treat the open rules as final.
 
 ### REST API
@@ -117,6 +135,21 @@ List records:
 
 ```sh
 curl http://127.0.0.1:8090/api/collections/todos/records
+```
+
+Create a tag and attach it to a todo, then filter by it:
+
+```sh
+curl -X POST http://127.0.0.1:8090/api/collections/tags/records \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Work"}'
+
+curl -X POST http://127.0.0.1:8090/api/collections/todos/records \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Buy milk","tags":["<tag-record-id>"]}'
+
+curl -G http://127.0.0.1:8090/api/collections/todos/records \
+  --data-urlencode 'filter=tags ~ "<tag-record-id>"'
 ```
 
 ### Verify

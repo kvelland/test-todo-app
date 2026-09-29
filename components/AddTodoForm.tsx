@@ -2,17 +2,26 @@
 
 import { useState } from "react";
 
-import type { Todo } from "@/lib/pocketbase";
+import type { Tag, Todo } from "@/lib/pocketbase";
 import { createTodo } from "@/lib/todos";
 import { TODO_TITLE_MAX_LENGTH, validateTodoTitle } from "@/lib/validation";
+import TagInput from "./TagInput";
 
 type AddTodoFormProps = {
   /** Called with the created todo so the list can insert it without a reload. */
   onAdded?: (todo: Todo) => void;
+  availableTags?: Tag[];
+  /** Called when the user creates a brand new tag, so the app can keep its list. */
+  onTagCreated?: (tag: Tag) => void;
 };
 
-export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
+export default function AddTodoForm({
+  onAdded,
+  availableTags = [],
+  onTagCreated,
+}: AddTodoFormProps) {
   const [title, setTitle] = useState("");
+  const [tags, setTags] = useState<Tag[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Creates run concurrently: the input clears as soon as a todo is submitted
   // so the user can type the next one straight away.
@@ -29,9 +38,13 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
 
     setError(null);
     setTitle("");
+    setTags([]);
     setPending((count) => count + 1);
 
-    const result = await createTodo(validation.value);
+    const result = await createTodo(
+      validation.value,
+      tags.map((tag) => tag.id),
+    );
 
     setPending((count) => count - 1);
 
@@ -47,19 +60,28 @@ export default function AddTodoForm({ onAdded }: AddTodoFormProps) {
 
   return (
     <form className="add-todo" onSubmit={handleSubmit} noValidate>
-      <span className="add-todo__plus" aria-hidden="true" />
-      <input
-        type="text"
-        className="add-todo__input"
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        placeholder="What needs doing?"
-        aria-label="New todo title"
-        maxLength={TODO_TITLE_MAX_LENGTH}
+      <div className="add-todo__row">
+        <span className="add-todo__plus" aria-hidden="true" />
+        <input
+          type="text"
+          className="add-todo__input"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="What needs doing?"
+          aria-label="New todo title"
+          maxLength={TODO_TITLE_MAX_LENGTH}
+        />
+        <button type="submit" className="add-todo__button">
+          <span className="add-todo__label">{pending > 0 ? "Adding…" : "Add"}</span>
+        </button>
+      </div>
+      <TagInput
+        label="Tags"
+        selected={tags}
+        availableTags={availableTags}
+        onChange={setTags}
+        onCreated={onTagCreated}
       />
-      <button type="submit" className="add-todo__button">
-        <span className="add-todo__label">{pending > 0 ? "Adding…" : "Add"}</span>
-      </button>
       {error ? (
         <p role="alert" className="add-todo__error">
           {error}
