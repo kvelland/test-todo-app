@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 PB_VERSION="${PB_VERSION:-0.40.4}"
 
-if [ -x ./pocketbase ] && ./pocketbase --version 2>/dev/null | grep -q "$PB_VERSION"; then
+if [ -x ./pocketbase ] && ./pocketbase --version 2>/dev/null | grep -qE "version ${PB_VERSION//./\\.}\$"; then
   echo "PocketBase $PB_VERSION already present."
   exit 0
 fi
