@@ -230,3 +230,95 @@ describe("TodoApp delete", () => {
     expect(screen.getByText("Buy milk")).toBeInTheDocument();
   });
 });
+
+describe("TodoApp edit", () => {
+  function setup() {
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo()],
+    });
+    render(<TodoApp />);
+    return userEvent.setup();
+  }
+
+  it("saves the trimmed title on Enter", async () => {
+    const user = setup();
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: true,
+      data: makeTodo({ title: "Buy oat milk" }),
+    });
+
+    await user.click(await screen.findByRole("button", { name: 'Edit "Buy milk"' }));
+    const input = screen.getByLabelText("Edit todo title");
+    expect(input).toHaveFocus();
+    await user.clear(input);
+    await user.type(input, "  Buy oat milk {Enter}");
+
+    expect(todos.updateTodo).toHaveBeenCalledTimes(1);
+    expect(todos.updateTodo).toHaveBeenCalledWith("1", {
+      title: "Buy oat milk",
+    });
+    expect(await screen.findByText("Buy oat milk")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Edit todo title")).not.toBeInTheDocument();
+  });
+
+  it("saves on blur and supports double-click to edit", async () => {
+    const user = setup();
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: true,
+      data: makeTodo({ title: "Buy bread" }),
+    });
+
+    await user.dblClick(await screen.findByText("Buy milk"));
+    const input = screen.getByLabelText("Edit todo title");
+    await user.clear(input);
+    await user.type(input, "Buy bread");
+    await user.tab();
+
+    expect(todos.updateTodo).toHaveBeenCalledWith("1", { title: "Buy bread" });
+    expect(await screen.findByText("Buy bread")).toBeInTheDocument();
+  });
+
+  it("cancels on Escape without saving", async () => {
+    const user = setup();
+
+    await user.click(await screen.findByRole("button", { name: 'Edit "Buy milk"' }));
+    const input = screen.getByLabelText("Edit todo title");
+    await user.clear(input);
+    await user.type(input, "Something else{Escape}");
+
+    expect(todos.updateTodo).not.toHaveBeenCalled();
+    expect(screen.getByText("Buy milk")).toBeInTheDocument();
+  });
+
+  it("keeps editing and shows an error for an empty title", async () => {
+    const user = setup();
+
+    await user.click(await screen.findByRole("button", { name: 'Edit "Buy milk"' }));
+    const input = screen.getByLabelText("Edit todo title");
+    await user.clear(input);
+    await user.type(input, "   {Enter}");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Title can't be empty.");
+    expect(screen.getByLabelText("Edit todo title")).toBeInTheDocument();
+    expect(todos.updateTodo).not.toHaveBeenCalled();
+  });
+
+  it("reverts the title and shows an error when saving fails", async () => {
+    const user = setup();
+    vi.mocked(todos.updateTodo).mockResolvedValue({
+      ok: false,
+      error: "Network unreachable",
+    });
+
+    await user.click(await screen.findByRole("button", { name: 'Edit "Buy milk"' }));
+    const input = screen.getByLabelText("Edit todo title");
+    await user.clear(input);
+    await user.type(input, "Buy bread{Enter}");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save: Network unreachable",
+    );
+    expect(screen.getByText("Buy milk")).toBeInTheDocument();
+  });
+});

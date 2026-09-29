@@ -159,8 +159,21 @@ button:disabled {
   font-size: 0.875rem;
 }
 
-.todo__delete {
+.todo__action {
   padding: 0.25rem 0.6rem;
   font-size: 0.875rem;
+}
+
+.todo__delete {
   color: var(--danger);
+}
+
+.todo__edit {
+  flex: 1;
+  min-width: 0;
+  padding: 0.2rem 0.5rem;
+}
+
+.todo__title {
+  cursor: text;
 }
