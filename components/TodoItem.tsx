@@ -82,7 +82,9 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   }
 
   function startEdit() {
-    const split = splitDeadline(todo.deadline);
+    // Seed from the shown values (optimistic when a save is still in flight) so
+    // reopening the editor never resurrects a deadline the user just replaced.
+    const split = splitDeadline(deadline);
     setDraft(title);
     setDraftDate(split?.date ?? "");
     setDraftTime(split?.time ?? "");
@@ -213,7 +215,7 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
                 value={draftDate}
                 onChange={(event) => setDraftDate(event.target.value)}
                 onKeyDown={handleKeyDown}
-                aria-label="Deadline date"
+                aria-label="Edit deadline date"
               />
               <input
                 type="time"
@@ -221,7 +223,7 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
                 value={draftTime}
                 onChange={(event) => setDraftTime(event.target.value)}
                 onKeyDown={handleKeyDown}
-                aria-label="Deadline time"
+                aria-label="Edit deadline time"
               />
             </span>
           </div>

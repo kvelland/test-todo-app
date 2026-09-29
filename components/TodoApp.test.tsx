@@ -511,12 +511,48 @@ describe("TodoApp deadlines", () => {
     const item = (await screen.findByText("Buy milk")).closest("li") as HTMLElement;
     await user.click(within(item).getByRole("button", { name: 'Edit "Buy milk"' }));
 
-    await user.type(within(item).getByLabelText("Deadline date"), "2027-01-15");
+    await user.type(within(item).getByLabelText("Edit deadline date"), "2027-01-15");
     await user.type(within(item).getByLabelText("Edit todo title"), "{Enter}");
 
     expect(todos.updateTodo).toHaveBeenCalledWith("1", {
       deadline: combineDeadline("2027-01-15", null),
     });
+  });
+
+  it("keeps the new deadline when the editor is reopened before the save resolves", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo({ id: "1", title: "Buy milk" })],
+    });
+    let resolveUpdate!: (value: todos.Result<Todo>) => void;
+    vi.mocked(todos.updateTodo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      }),
+    );
+
+    render(<TodoApp />);
+    const first = (await screen.findByText("Buy milk")).closest("li") as HTMLElement;
+    await user.click(within(first).getByRole("button", { name: 'Edit "Buy milk"' }));
+    await user.type(within(first).getByLabelText("Edit deadline date"), "2027-01-15");
+    await user.type(within(first).getByLabelText("Edit todo title"), "{Enter}");
+
+    // The optimistic deadline is already showing; reopening the editor must not
+    // fall back to the saved (deadline-less) todo and wipe it on the next save.
+    const reopened = (await screen.findByText("Buy milk")).closest("li") as HTMLElement;
+    await user.click(within(reopened).getByRole("button", { name: 'Edit "Buy milk"' }));
+    expect(within(reopened).getByLabelText("Edit deadline date")).toHaveValue("2027-01-15");
+
+    resolveUpdate({
+      ok: true,
+      data: makeTodo({
+        id: "1",
+        title: "Buy milk",
+        deadline: combineDeadline("2027-01-15", null) as string,
+      }),
+    });
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 });
 
