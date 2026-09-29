@@ -62,10 +62,12 @@ v0.40.4 as the backend. Read this whole file before planning or writing code.
   If you need a new query, add a function to `lib/todos.ts` in the same style, with tests in
   `lib/todos.test.ts`.
 
-- **`Todo` type** comes from `lib/pocketbase.ts`: `id`, `title`, `completed`, `created`,
-  `updated`. `listTodos` returns newest first (`sort: "-created"`).
+- **`Todo` type** comes from `lib/pocketbase.ts`: `id`, `title`, `description`, `completed`,
+  `created`, `updated`. `listTodos` returns newest first (`sort: "-created"`).
 - **Titles** are validated with `validateTodoTitle` (trimmed, 1–200 chars, matching the
   PocketBase schema). Reuse it; don't write another validator.
+- **Descriptions** are validated with `validateTodoDescription` (optional, trimmed, line breaks
+  kept, ≤ 2000 chars, matching the PocketBase schema). Reuse it; don't write another validator.
 - **Schema changes** go in a _new_ file in `pb_migrations/` with a larger Unix-seconds prefix
   than existing ones. Never edit an existing migration. Keep `down` reversible.
 - **UI state:** `TodoApp` owns the list; children report changes via `onAdded` / `onChanged` /
@@ -73,7 +75,11 @@ v0.40.4 as the backend. Read this whole file before planning or writing code.
 - **Accessibility is part of the contract** — tests select by these, so keep them stable:
   input label `New todo title`, button `Add` / `Adding…`, checkbox `Mark "<title>" as complete`,
   `Edit "<title>"`, `Delete "<title>"`, edit input `Edit todo title`, `role="status"` while
-  loading, empty text `No todos yet`.
+  loading, empty text `No todos yet`; for descriptions: textarea
+  `New todo description`, textarea `Edit todo description`,
+  `Show description for "<title>"` / `Hide description for "<title>"`,
+  `Add description for "<title>"` / `Edit description for "<title>"`,
+  `Save description for "<title>"`, `Cancel description for "<title>"`.
 - **Styling:** plain CSS in `app/globals.css` using the existing tokens (`--accent`, `--done`,
   `--ink`, …). No Tailwind or CSS-in-JS. Light theme only. Any new animation must be covered
   by the `prefers-reduced-motion` block.
