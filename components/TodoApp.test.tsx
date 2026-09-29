@@ -172,3 +172,61 @@ describe("TodoApp toggle", () => {
     expect(checkbox).not.toBeChecked();
   });
 });
+
+describe("TodoApp delete", () => {
+  it("removes the todo after the API confirms", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo(), makeTodo({ id: "2", title: "Walk the dog" })],
+    });
+    vi.mocked(todos.deleteTodo).mockResolvedValue({
+      ok: true,
+      data: undefined,
+    });
+
+    render(<TodoApp />);
+    await user.click(await screen.findByRole("button", { name: 'Delete "Buy milk"' }));
+
+    expect(todos.deleteTodo).toHaveBeenCalledWith("1");
+    await waitFor(() => expect(screen.queryByText("Buy milk")).not.toBeInTheDocument());
+    expect(screen.getByText("Walk the dog")).toBeInTheDocument();
+  });
+
+  it("shows the empty state after deleting the last todo", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo()],
+    });
+    vi.mocked(todos.deleteTodo).mockResolvedValue({
+      ok: true,
+      data: undefined,
+    });
+
+    render(<TodoApp />);
+    await user.click(await screen.findByRole("button", { name: 'Delete "Buy milk"' }));
+
+    expect(await screen.findByText("No todos yet")).toBeInTheDocument();
+  });
+
+  it("keeps the todo and shows an error when deleting fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(todos.listTodos).mockResolvedValue({
+      ok: true,
+      data: [makeTodo()],
+    });
+    vi.mocked(todos.deleteTodo).mockResolvedValue({
+      ok: false,
+      error: "Network unreachable",
+    });
+
+    render(<TodoApp />);
+    await user.click(await screen.findByRole("button", { name: 'Delete "Buy milk"' }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not delete: Network unreachable",
+    );
+    expect(screen.getByText("Buy milk")).toBeInTheDocument();
+  });
+});
