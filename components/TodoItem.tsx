@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { deadlineState, formatDeadline, splitDeadline } from "@/lib/deadline";
 import type { Todo } from "@/lib/pocketbase";
 import { deleteTodo, updateTodo } from "@/lib/todos";
-import { TODO_TITLE_MAX_LENGTH, validateTodoTitle } from "@/lib/validation";
+import { TODO_TITLE_MAX_LENGTH, validateDeadline, validateTodoTitle } from "@/lib/validation";
 
 const LEAVE_MS = 280;
 
@@ -27,17 +28,25 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   // Optimistic values shown while a save is in flight; null means "use the saved todo".
   const [optimisticCompleted, setOptimisticCompleted] = useState<boolean | null>(null);
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
+  const [optimisticDeadline, setOptimisticDeadline] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(todo.title);
+  const [draftDate, setDraftDate] = useState("");
+  const [draftTime, setDraftTime] = useState("");
   // Guards against Enter/Escape and the blur that follows both committing.
   const committedRef = useRef(false);
 
   const completed = optimisticCompleted ?? todo.completed;
   const title = optimisticTitle ?? todo.title;
+  const deadline = optimisticDeadline ?? todo.deadline;
   const toggling = optimisticCompleted !== null;
+
+  const state = deadline ? deadlineState(deadline, new Date()) : "none";
+  // Completed todos show their deadline but are never marked overdue.
+  const overdue = state === "overdue" && !completed;
 
   async function handleToggle() {
     const next = !completed;
@@ -73,7 +82,10 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   }
 
   function startEdit() {
+    const split = splitDeadline(todo.deadline);
     setDraft(title);
+    setDraftDate(split?.date ?? "");
+    setDraftTime(split?.time ?? "");
     setError(null);
     committedRef.current = false;
     setEditing(true);
@@ -88,10 +100,17 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
   async function saveEdit() {
     if (committedRef.current) return;
 
-    const validation = validateTodoTitle(draft);
-    if (!validation.ok) {
+    const titleCheck = validateTodoTitle(draft);
+    if (!titleCheck.ok) {
       // Stay in edit mode so the user can correct the title.
-      setError(validation.error);
+      setError(titleCheck.error);
+      return;
+    }
+
+    const deadlineCheck = validateDeadline({ date: draftDate, time: draftTime });
+    if (!deadlineCheck.ok) {
+      // Stay in edit mode so the user can correct the deadline.
+      setError(deadlineCheck.error);
       return;
     }
 
@@ -99,11 +118,19 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     setEditing(false);
     setError(null);
 
-    if (validation.value === todo.title) return;
+    const nextDeadline = deadlineCheck.value ?? "";
+    const patch: Partial<Pick<Todo, "title" | "deadline">> = {};
+    if (titleCheck.value !== todo.title) patch.title = titleCheck.value;
+    if (nextDeadline !== todo.deadline) patch.deadline = nextDeadline;
+    if (patch.title === undefined && patch.deadline === undefined) return;
 
-    setOptimisticTitle(validation.value);
-    const result = await updateTodo(todo.id, { title: validation.value });
+    if (patch.title !== undefined) setOptimisticTitle(patch.title);
+    if (patch.deadline !== undefined) setOptimisticDeadline(patch.deadline);
+
+    const result = await updateTodo(todo.id, patch);
+
     setOptimisticTitle(null);
+    setOptimisticDeadline(null);
 
     if (result.ok) {
       onChanged(result.data);
@@ -122,12 +149,28 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
     }
   }
 
+  // Save once focus leaves the whole edit block (title or either deadline field),
+  // not when it merely moves between them.
+  function handleEditBlur(event: React.FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      void saveEdit();
+    }
+  }
+
   const className = [
     "todo",
     completed && "todo--completed",
     editing && "todo--editing",
     deleting && "todo--deleting",
     leaving && "todo--leaving",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const dueClassName = [
+    "todo__due",
+    overdue && "todo__due--overdue",
+    !overdue && state === "today" && "todo__due--today",
   ]
     .filter(Boolean)
     .join(" ");
@@ -151,22 +194,49 @@ export default function TodoItem({ todo, index = 0, onChanged, onDeleted }: Todo
       </label>
       <div className="todo__body">
         {editing ? (
-          <input
-            type="text"
-            className="todo__edit"
-            // Focus moves here as the direct result of the user asking to edit.
-            autoFocus
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={() => void saveEdit()}
-            maxLength={TODO_TITLE_MAX_LENGTH}
-            aria-label="Edit todo title"
-          />
+          <div className="todo__edit-fields" onBlur={handleEditBlur}>
+            <input
+              type="text"
+              className="todo__edit"
+              // Focus moves here as the direct result of the user asking to edit.
+              autoFocus
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleKeyDown}
+              maxLength={TODO_TITLE_MAX_LENGTH}
+              aria-label="Edit todo title"
+            />
+            <span className="todo__edit-deadline">
+              <input
+                type="date"
+                className="todo__edit-date"
+                value={draftDate}
+                onChange={(event) => setDraftDate(event.target.value)}
+                onKeyDown={handleKeyDown}
+                aria-label="Deadline date"
+              />
+              <input
+                type="time"
+                className="todo__edit-time"
+                value={draftTime}
+                onChange={(event) => setDraftTime(event.target.value)}
+                onKeyDown={handleKeyDown}
+                aria-label="Deadline time"
+              />
+            </span>
+          </div>
         ) : (
-          <span className="todo__title" onDoubleClick={startEdit}>
-            {title}
-          </span>
+          <>
+            <span className="todo__title" onDoubleClick={startEdit}>
+              {title}
+            </span>
+            {deadline ? (
+              <span className={dueClassName}>
+                <span className="todo__due-date">{formatDeadline(deadline)}</span>
+                {overdue ? <span className="todo__due-flag">Overdue</span> : null}
+              </span>
+            ) : null}
+          </>
         )}
       </div>
       <div className="todo__actions">

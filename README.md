@@ -47,7 +47,32 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to list, add, complete, edit
-(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos.
+(Edit button or double-click; Enter/blur saves, Escape cancels), and delete todos, and to
+set deadlines and sort the list — see [Deadlines and sorting](#deadlines-and-sorting).
+
+## Deadlines and sorting
+
+Todos can have an optional deadline, and the list can be sorted by it.
+
+- **Set a deadline** when adding a todo, or when editing an existing one (Edit button or
+  double-click). Pick a date and, optionally, a time of day.
+- **Time of day is optional.** Leave it blank and the deadline means the **end of that day** in
+  your local time zone.
+- **Deadlines are shown on each todo**, e.g. `Due 3 Oct` or `Due today 14:00`. Todos past their
+  date are labelled **Overdue**; todos due today show **Due today**. Completed todos keep their
+  deadline but are never marked overdue.
+- Deadlines are stored in UTC and displayed in your local time zone.
+
+The sort control above the list offers:
+
+| Order                      | Behaviour                                             |
+| -------------------------- | ----------------------------------------------------- |
+| `Date created`             | Newest first (the original default).                  |
+| `Deadline, earliest first` | Soonest deadline first; todos with no deadline last.  |
+| `Deadline, latest first`   | Furthest deadline first; todos with no deadline last. |
+
+Todos that share a deadline keep their newest-first creation order. The chosen sort order is
+remembered in the browser (`localStorage`) and restored on reload.
 
 ## Scripts
 
@@ -91,13 +116,14 @@ the existing file.
 
 ### Schema — `todos`
 
-| Field       | Type     | Rules                    |
-| ----------- | -------- | ------------------------ |
-| `id`        | text     | system, auto-generated   |
-| `title`     | text     | required, max 200 chars  |
-| `completed` | bool     | default `false`          |
-| `created`   | autodate | set on create            |
-| `updated`   | autodate | set on create and update |
+| Field       | Type     | Rules                                |
+| ----------- | -------- | ------------------------------------ |
+| `id`        | text     | system, auto-generated               |
+| `title`     | text     | required, max 200 chars              |
+| `completed` | bool     | default `false`                      |
+| `deadline`  | date     | optional; empty string = no deadline |
+| `created`   | autodate | set on create                        |
+| `updated`   | autodate | set on create and update             |
 
 API rules for `todos` are currently **public** (empty rules): list, view, create, update, and
 delete all work without authentication — this is a single-user setup for now. Authentication is a
@@ -105,12 +131,12 @@ later round; do not treat the open rules as final.
 
 ### REST API
 
-Create a record:
+Create a record (with an optional deadline; omit `deadline` or pass `""` for none):
 
 ```sh
 curl -X POST http://127.0.0.1:8090/api/collections/todos/records \
   -H 'Content-Type: application/json' \
-  -d '{"title":"Buy milk"}'
+  -d '{"title":"Buy milk","deadline":"2026-10-03T21:59:59.999Z"}'
 ```
 
 List records:
@@ -122,7 +148,8 @@ curl http://127.0.0.1:8090/api/collections/todos/records
 ### Verify
 
 Run the end-to-end check against a throwaway data directory (boots PocketBase on port 8099,
-creates and reads a record, asserts the response shape, then cleans up):
+creates records with and without a deadline, reads them back, asserts the response shape and that
+the deadline round-trips, then cleans up):
 
 ```sh
 ./scripts/verify-todos.sh

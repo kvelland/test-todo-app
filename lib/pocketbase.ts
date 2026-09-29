@@ -4,6 +4,8 @@ export type Todo = {
   id: string;
   title: string;
   completed: boolean;
+  /** PocketBase date string ("YYYY-MM-DD HH:mm:ss.SSSZ", UTC), or "" when the todo has no deadline. */
+  deadline: string;
   created: string;
   updated: string;
 };
